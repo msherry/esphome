@@ -73,6 +73,8 @@ sensor:
       #   pullup: false           # This DHT11 has an external pullup resistor
     temperature:
       name: "Sauna temperature"
+      accuracy_decimals: 1
     humidity:
       name: "Sauna humidity"
+      accuracy_decimals: 1
     update_interval: 60s
