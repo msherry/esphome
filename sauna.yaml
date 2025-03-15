@@ -1,6 +1,10 @@
-esphome:
+substitutions:
   name: sauna
   friendly_name: "Sauna"
+
+esphome:
+  name: $name
+  friendly_name: $friendly_name
 
 esp8266:
   board: d1_mini
@@ -43,25 +47,25 @@ time:
 text_sensor:
   # Expose ESPHome version as sensor.
   - platform: version
-    name: Sauna ESPHome Version
+    name: $friendly_name ESPHome Version
   # Expose WiFi information as sensors.
   - platform: wifi_info
     ip_address:
-      name: Sauna IP
+      name: $friendly_name IP
     ssid:
-      name: Sauna SSID
+      name: $friendly_name SSID
     bssid:
-      name: Sauna BSSID
+      name: $friendly_name BSSID
 
 # Sensors with general information.
 sensor:
   # Uptime sensor.
   - platform: uptime
-    name: Sauna Uptime
+    name: $friendly_name Uptime
 
   # WiFi Signal sensor.
   - platform: wifi_signal
-    name: Sauna WiFi Signal
+    name: $friendly_name WiFi Signal
     update_interval: 60s
 
   # DHT11 temp/humidity sensor
