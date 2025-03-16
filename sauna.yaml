@@ -60,6 +60,12 @@ text_sensor:
     bssid:
       name: $friendly_name BSSID
 
+# Exposed switches/buttons.
+button:
+  # Button to restart the device.
+  - platform: restart
+    name: $friendly_name Restart
+
 # Sensors with general information.
 sensor:
   # Uptime sensor.
