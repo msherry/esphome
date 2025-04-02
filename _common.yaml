@@ -3,9 +3,6 @@ esphome:
   # friendly_name: $friendly_name # https://community.home-assistant.io/t/how-is-friendly-name-supposed-to-behave/542570/35
   area: $area
 
-esp8266:
-  board: d1_mini
-
 # Enable logging
 logger:
 

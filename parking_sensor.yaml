@@ -1,0 +1,53 @@
+substitutions:
+  name: parking_sensor
+  friendly_name: "Parking Sensor"
+  area: Garage
+
+esp32:
+  board: upesy_wroom
+  framework:
+    type: arduino
+
+<<: !include _common.yaml
+
+# Configurable options
+number:
+  - platform: template
+    name: "Update interval"
+    id: upd_int
+    max_value: 10
+    min_value: 0.25
+    step: 0.25
+    mode: slider
+    initial_value: 5.0
+    optimistic: true
+    on_value:
+      # Update interval is in ms - account for window size to find actual update interval
+      - lambda: |-
+          id(ultrasonic_sensor).set_update_interval(x * 1000 / 2);
+          id(ultrasonic_sensor).call_setup();
+
+sensor:
+  # Ultrasonic sensor: https://esphome.io/components/sensor/ultrasonic.html
+  - platform: ultrasonic
+    trigger_pin: GPIO19
+    echo_pin: GPIO18
+    name: "Ultrasonic sensor"
+    id: ultrasonic_sensor
+    update_interval: 10s
+    timeout: 2m               # meters for timeout - max 2
+    filters:
+      - median:
+          window_size: 2
+          send_every: 2
+          send_first_at: 1
+
+binary_sensor:
+  - platform: template
+    name: "Clear to close"
+    lambda: |-
+      if (id(ultrasonic_sensor).state < 2.0) {
+        return false;
+      } else {
+        return true;
+      }
