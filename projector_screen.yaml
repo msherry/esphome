@@ -1,0 +1,130 @@
+# Upload with `esphome run projector_screen.yaml`
+
+esphome:
+  name: projectorscreen
+
+esp32:
+  board: upesy_wroom
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+  baud_rate: 115200
+
+# Enable Home Assistant API
+api:
+  password: ""
+
+ota:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: !secret wifi_fallback_ssid
+    password: !secret wifi_fallback_ap_password
+
+captive_portal:
+
+# My code
+
+.down_time: &DOWN_TIME 31015ms
+.up_time: &UP_TIME 31685ms
+.switch_delay: &RELAY_SWITCH_DELAY 200ms
+
+# Front-mounted IR LED
+# https://esphome.io/components/remote_receiver.html
+remote_receiver:
+  pin:
+    number: GPIO13
+    inverted: true
+    mode:
+      input: true
+      pullup: true
+  dump: lg
+
+binary_sensor:
+  # IR remote inputs
+  - platform: remote_receiver
+    name: "Remote down button"
+    lg:
+      data: 0xFFE01F
+      nbits: 32
+    on_press:
+      then:
+        - cover.close: projector_screen
+  - platform: remote_receiver
+    name: "Remote up button"
+    lg:
+      data: 0xFFA857
+      nbits: 32
+    on_press:
+      then:
+        - cover.open: projector_screen
+
+  # Pushbutton inputs
+  - platform: gpio
+    name: "Physical down button"
+    pin:
+      number: GPIO27
+      mode:
+        input: true
+        pulldown: true
+    on_press:
+      then:
+        - cover.close: projector_screen
+    filters:
+      - delayed_off: 400ms
+
+  - platform: gpio
+    name: "Physical up button"
+    pin:
+      number: GPIO26
+      mode:
+        input: true
+        pulldown: true
+    on_press:
+      then:
+        - cover.open: projector_screen
+    filters:
+      - delayed_off: 400ms
+
+switch:
+  - platform: gpio
+    name: Relay Up
+    pin: GPIO32
+    id: relay_up
+    interlock: [relay_down]
+    interlock_wait_time: 1s
+
+  - platform: gpio
+    name: Relay Down
+    pin: GPIO33
+    id: relay_down
+    interlock: [relay_up]
+    interlock_wait_time: 1s
+
+
+cover:
+  - platform: time_based
+    name: Projector screen
+    id: projector_screen
+
+    open_action:
+      - switch.turn_off: relay_down
+      - delay: *RELAY_SWITCH_DELAY
+      - switch.turn_on: relay_up
+    open_duration: *DOWN_TIME
+
+    close_action:
+      - switch.turn_off: relay_up
+      - delay: *RELAY_SWITCH_DELAY
+      - switch.turn_on: relay_down
+    close_duration: *UP_TIME
+
+    stop_action:
+      - switch.turn_off: relay_up
+      - switch.turn_off: relay_down
