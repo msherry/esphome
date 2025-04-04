@@ -6,7 +6,8 @@ substitutions:
 esp8266:
   board: d1_mini
 
-<<: !include _common.yaml
+packages:
+  device_base: !include _common.yaml
 
 sensor:
   # DHT11 temp/humidity sensor
