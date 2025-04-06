@@ -5,7 +5,7 @@ substitutions:
   area: replace_me
 
 esp8266:
-  board: d1_mini
+  board: esp01_1m
 
 packages:
   device_base: !include _common.yaml
@@ -26,15 +26,15 @@ climate:
     id: hp
     name: "${friendly_name} heat pump"
     icon: mdi:heat-pump
-    visual:
-      min_temperature: 60 # Adjust to your unit's min temp. SmartSet units can go to 10C for heating
-      max_temperature: 85
-      temperature_step:
-        target_temperature: 0.5
-        current_temperature: 0.1
+    # visual:
+    #   min_temperature: 60 # Adjust to your unit's min temp. SmartSet units can go to 10C for heating
+    #   max_temperature: 85
+    #   temperature_step:
+    #     target_temperature: 0.5
+    #     current_temperature: 0.1
     # Timeout and communication settings
     remote_temperature_timeout: 30min
-    update_interval: 2s    # update interval can be adjusted after a first run and logs monitoring
+    update_interval: 60s    # update interval can be adjusted after a first run and logs monitoring
     debounce_delay : 100ms
     # Various optional sensors, not all sensors are supported by all heatpumps
     compressor_frequency_sensor:
@@ -79,4 +79,4 @@ climate:
 # Default logging level
 logger:
   hardware_uart: UART1 # Uncomment on ESP8266 devices
-  level: DEBUG
+  level: INFO
