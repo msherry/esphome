@@ -1,4 +1,7 @@
 # https://github.com/echavet/MitsubishiCN105ESPHome
+
+# Compile with these filled in -- e.g.
+# esphome -s name 'living_room_56' -s area 'Living room 56' -s friendly_name 'Living Room 56' run heat_pump.yaml
 substitutions:
   name: replace_me
   friendly_name: "replace_me"
