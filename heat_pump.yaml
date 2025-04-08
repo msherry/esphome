@@ -37,7 +37,7 @@ climate:
     #     current_temperature: 0.1
     # Timeout and communication settings
     remote_temperature_timeout: 30min
-    update_interval: 60s    # update interval can be adjusted after a first run and logs monitoring
+    update_interval: 15s    # update interval can be adjusted after a first run and logs monitoring
     debounce_delay : 100ms
     # Various optional sensors, not all sensors are supported by all heatpumps
     compressor_frequency_sensor:
