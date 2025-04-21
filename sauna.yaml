@@ -9,6 +9,10 @@ esp8266:
 packages:
   device_base: !include _common.yaml
 
+# wifi:
+#   # for changing name -- use old name here, rename above
+#   use_address: sauna2.local
+
 sensor:
   # DHT11 temp/humidity sensor
   - platform: dht
