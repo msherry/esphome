@@ -26,6 +26,22 @@ switch:
     name: Door buzzer relay
     pin: GPIO0
 
+  # It creates a "virtual" switch based on a global variable.
+  - platform: template
+    name: Buzzer enabled
+    id: buzzer_enabled
+    restore_mode: DISABLED
+    turn_on_action:
+      - globals.set:
+          id: enabled
+          value: 'true'
+    turn_off_action:
+      - globals.set:
+          id: enabled
+          value: 'false'
+    lambda: |-
+      return id(enabled);
+
 button:
   - platform: template
     name: Door buzzer
