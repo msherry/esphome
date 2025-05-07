@@ -1,0 +1,44 @@
+substitutions:
+  name: buzzer
+  friendly_name: "Buzzer"
+  area: Stairwell
+
+esp8266:
+  board: esp01_1m
+
+packages:
+  device_base: !include _common.yaml
+
+
+# Global to store the enabled state of the buzzer
+globals:
+  - id: enabled
+    type: bool
+    restore_value: true
+    initial_value: 'true'
+
+
+switch:
+  # Turn on/off the buzzer relay
+  - platform: gpio
+    id: relay
+    inverted: false
+    name: Door buzzer relay
+    pin: GPIO0
+
+button:
+  - platform: template
+    name: Door buzzer
+    id: buzzer_button
+    on_press:
+      then:
+        - if:
+            condition:
+              lambda: 'return id(enabled);'
+            then:
+              - logger.log: "Button pressed"
+              - switch.turn_on: relay
+              - delay: 5s
+              - switch.turn_off: relay
+            else:
+              - logger.log: "Button press ignored: buzzer disabled"
