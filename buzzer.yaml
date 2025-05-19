@@ -19,12 +19,13 @@ globals:
 
 
 switch:
-  # Turn on/off the buzzer relay
+  # Turn on/off the buzzer relay - meant to be used as a helper
   - platform: gpio
     id: relay
     inverted: false
     name: Door buzzer relay
     pin: GPIO0
+    entity_category: diagnostic
 
   # It creates a "virtual" switch based on a global variable.
   - platform: template
@@ -54,7 +55,7 @@ button:
             then:
               - logger.log: "Button pressed"
               - switch.turn_on: relay
-              - delay: 5s
+              - delay: 4s
               - switch.turn_off: relay
             else:
               - logger.log: "Button press ignored: buzzer disabled"
