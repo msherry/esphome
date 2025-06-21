@@ -46,8 +46,4 @@ binary_sensor:
   - platform: template
     name: "Clear to close"
     lambda: |-
-      if (id(ultrasonic_sensor).state < 2.0) {
-        return false;
-      } else {
-        return true;
-      }
+      return (id(ultrasonic_sensor).state < 2.0)
