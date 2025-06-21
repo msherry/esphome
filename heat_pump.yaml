@@ -35,6 +35,10 @@ climate:
     #   temperature_step:
     #     target_temperature: 0.5
     #     current_temperature: 0.1
+
+    # Fahrenheit compatibility mode - uses Mitsubishi's "custom" unit conversions, set to
+    # "true" for better support of Fahrenheit units in HomeAssistant
+    fahrenheit_compatibility: false
     # Timeout and communication settings
     remote_temperature_timeout: 30min
     update_interval: 15s    # update interval can be adjusted after a first run and logs monitoring
