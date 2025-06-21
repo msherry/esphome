@@ -18,6 +18,17 @@ globals:
     initial_value: 'true'
 
 
+number:
+  - platform: template
+    id: buzzer_delay_seconds
+    name: Buzzer Delay
+    optimistic: true
+    min_value: 1
+    max_value: 10
+    step: 1
+    initial_value: 4
+    unit_of_measurement: s
+
 switch:
   # Turn on/off the buzzer relay - meant to be used as a helper
   - platform: gpio
@@ -55,7 +66,7 @@ button:
             then:
               - logger.log: "Button pressed"
               - switch.turn_on: relay
-              - delay: 4s
+              - delay: !lambda 'return (uint32_t)(id(buzzer_delay_seconds).state * 1000);' # values are in ms when computed
               - switch.turn_off: relay
             else:
               - logger.log: "Button press ignored: buzzer disabled"
