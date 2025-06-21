@@ -1,0 +1,41 @@
+substitutions:
+  name: watt_meter
+  friendly_name: "Watt meter"
+  area: Office
+
+esp32:
+  board: esp32-c3-devkitm-1
+
+packages:
+  device_base: !include _common.yaml
+
+
+# https://community.home-assistant.io/t/esp32-c3-72x40-oled-esphome/852490/9
+sensor:
+  platform: homeassistant
+  id: outlet_power
+  entity_id: sensor.office_outlet_3_power
+  name: "Power"
+  accuracy_decimals: 1
+  unit_of_measurement: "W"
+
+i2c:
+  sda: GPIO5
+  scl: GPIO6
+  scan: true
+  id: bus_i2c
+  frequency: 800kHz
+
+font:
+  - file: 'gfonts://Inter'
+    id: my_font
+    size: 24
+
+display:
+  - platform: ssd1306_i2c
+    model: "SSD1306 72x40"
+    # model: "SH1106_128x64"
+    rotation: 0
+    update_interval: 3s
+    lambda: |-
+      it.printf(it.get_width()/2, it.get_height()/2, id(my_font), TextAlign::CENTER, "%.01f W", id(outlet_power).state);
