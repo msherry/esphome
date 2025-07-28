@@ -70,3 +70,14 @@ button:
               - switch.turn_off: relay
             else:
               - logger.log: "Button press ignored: buzzer disabled"
+
+# Try to cut idle power usage: https://github.com/esphome/feature-requests/issues/2586
+binary_sensor:
+  - platform: gpio
+    id: gpio3
+    pin:
+      number: GPIO3
+      mode: INPUT_PULLUP
+
+wifi:
+  power_save_mode: light
