@@ -8,7 +8,10 @@ logger:
 
 # Enable Home Assistant API
 api:
+  # passwords are deprecated -- encryption keys are now preferred
   # password: ""
+  encryption:
+    key: !secret api_encryption_key
 
 # Enable over-the-air updates.
 ota:
@@ -52,13 +55,16 @@ text_sensor:
     ip_address:
       name: "${friendly_name} IP"
       entity_category: diagnostic
+      update_interval: 600s
     ssid:
       name: "${friendly_name} SSID"
       entity_category: diagnostic
+      update_interval: 600s
     bssid:
       name: "${friendly_name} BSSID"
       entity_category: diagnostic
       disabled_by_default: true
+      update_interval: 600s
 
 # Exposed switches/buttons.
 button:
@@ -71,12 +77,13 @@ sensor:
   # Uptime sensor.
   - platform: uptime
     name: "${friendly_name} Uptime"
+    update_interval: 600s
     entity_category: diagnostic
     disabled_by_default: true
 
   # WiFi Signal sensor.
   - platform: wifi_signal
     name: "${friendly_name} WiFi Signal"
-    update_interval: 60s
+    update_interval: 600s
     entity_category: diagnostic
     disabled_by_default: true
