@@ -1,0 +1,99 @@
+esp8266:
+  board: d1_mini
+
+packages:
+  device_base: !include _common.yaml
+
+output:
+  - platform: esp8266_pwm
+    pin: D1
+    frequency: 1000 Hz
+    id: red_output
+    inverted: true
+  - platform: esp8266_pwm
+    pin: D5
+    frequency: 1000 Hz
+    id: green_output
+    inverted: true
+  - platform: esp8266_pwm
+    pin: D6
+    frequency: 1000 Hz
+    id: blue_output
+    inverted: true
+
+light:
+  - platform: rgb
+    id: remote_light
+    name: "Sauna remote light"
+    red: red_output
+    green: green_output
+    blue: blue_output
+    effects:
+      - pulse:
+          name: "Slow pulse"
+          transition_length:
+            on_length: 1000ms
+            off_length: 800ms
+          update_interval: 1800ms
+      - pulse:
+          name: "Fast pulse"
+          transition_length:
+            on_length: 400ms
+            off_length: 400ms
+          update_interval: 800ms
+      - pulse:
+          name: "Hyper pulse"
+          transition_length:
+            on_length: 200ms
+            off_length: 200ms
+          update_interval: 400ms
+
+binary_sensor:
+  - platform: gpio
+    name: "Button"
+    pin:
+      number: D2
+      mode: INPUT_PULLUP
+      inverted: true          # pressed = ON when wired to GND + pull-up
+    filters:
+      - delayed_on: 20ms
+      - delayed_off: 500ms
+    on_press:
+      # - logger.log:
+      #     level: INFO
+      #     format: "Button pressed"
+      - homeassistant.action:
+          action: switch.toggle
+          data:
+            entity_id: "switch.sauna_outlet_switch_0"
+
+text_sensor:
+  - platform: homeassistant
+    name: "Sauna state"
+    entity_id: sensor.sauna_state
+    internal: true
+    on_value:
+      then:
+        # - logger.log:
+        #     level: INFO
+        #     format: "Remote sauna state received from HA: %s"
+        #     args: ["x.c_str()"]
+        - lambda: |-
+            ESP_LOGI("sauna", "State changed: %s", x.c_str());
+            auto call = id(remote_light).turn_on().set_effect("None");
+            if (x == "Off") {
+              // Replace the call with a new one
+              call = id(remote_light).turn_off();
+            } else if (x == "Warming") {
+              call.set_rgb(1.0, 0.68, 0.0);
+            } else if (x == "Ready") {
+              call.set_rgb(1.0, 0.42, 0.0).set_effect("Slow pulse");
+            } else if (x == "Idle") {
+              call.set_rgb(0.2, 0.5, 0.0);
+            } else if (x == "Disarmed?") {
+              call.set_rgb(0.0, 0.79, 1.0).set_effect("Fast pulse");
+            } else {
+              ESP_LOGW("sauna", "Unknown state: %s", x.c_str());
+              call.set_rgb(1.0, 0.2, 0.0).set_effect("Hyper pulse");
+            }
+            call.perform();
