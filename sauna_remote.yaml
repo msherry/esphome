@@ -7,6 +7,14 @@ packages:
 substitutions:
   update_interval: 3600s
 
+esphome:
+  on_boot:
+    # work around https://github.com/esphome/feature-requests/issues/607
+    # set a default value for the skip counter, otherwise it's nan
+    - sensor.template.publish:
+        id: battery_percentage_skips
+        state: 0
+
 wifi:
   power_save_mode: HIGH
 
@@ -77,6 +85,7 @@ text_sensor:
   - platform: homeassistant
     name: "Sauna state"
     entity_id: sensor.sauna_state
+    update_interval: 3600s
     internal: true
     on_value:
       then:
@@ -139,15 +148,61 @@ sensor:
     lambda: |-
       float v = id(battery_voltage).state;
 
-      // Clamp measurable range
       const float v_full = 4.20;   // full
       const float v_empty = 3.00;  // empty
 
+      // Clamp measurable range
       if (v > v_full) v = v_full;
       else if (v < v_empty) v = v_empty;
 
-      return (v - v_empty) / (v_full - v_empty) * 100.0;
+      // Piecewise discharge curve (Li-ion 1S)
+      // {voltage, percent}
+      const float curve[][2] = {
+        {3.00,   0},
+        {3.30,  10},
+        {3.42,  20},
+        {3.50,  30},
+        {3.62,  40},
+        {3.70,  50},
+        {3.78,  60},
+        {3.85,  70},
+        {3.98,  80},
+        {4.10,  90},
+        {4.20, 100}
+      };
+
+      // Iterate across points and interpolate
+      for (int i = 0; i < (int)(sizeof(curve)/sizeof(curve[0])) - 1; i++) {
+        float v_low = curve[i][0];
+        float p_low = curve[i][1];
+        float v_high  = curve[i+1][0];
+        float p_high  = curve[i+1][1];
+
+        if (v <= v_high) {
+          // Linear interpolation
+          float pct = p_low + (p_high - p_low) * ((v - v_low) / (v_high - v_low));
+          return pct;
+        }
+      }
+
+      // Fallback (should never hit)
+      return 0.0;
+
+      // Original, non-interpolated formula
+      // return (v - v_empty) / (v_full - v_empty) * 100.0;
     filters:
+      # work around https://github.com/esphome/feature-requests/issues/607
+      # increment a skip counter, this skips the first N measurements
+      - lambda: |-
+          auto s = id(battery_percentage_skips);
+          if (s->state > 1) { return x; }
+          else { s->publish_state(s->state+1); return {}; }
+
       - exponential_moving_average:
           alpha: 0.1
           send_every: 1
+
+  - platform: template
+    id: battery_percentage_skips
+    internal: true
+    accuracy_decimals: 0
