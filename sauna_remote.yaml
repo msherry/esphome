@@ -4,19 +4,22 @@ esp8266:
 packages:
   device_base: !include _common.yaml
 
+wifi:
+  power_save_mode: LIGHT
+
 output:
   - platform: esp8266_pwm
-    pin: D1
+    pin: D5
     frequency: 1000 Hz
     id: red_output
     inverted: true
   - platform: esp8266_pwm
-    pin: D5
+    pin: D6
     frequency: 1000 Hz
     id: green_output
     inverted: true
   - platform: esp8266_pwm
-    pin: D6
+    pin: D7
     frequency: 1000 Hz
     id: blue_output
     inverted: true
@@ -97,3 +100,49 @@ text_sensor:
               call.set_rgb(1.0, 0.2, 0.0).set_effect("Hyper pulse");
             }
             call.perform();
+
+sensor:
+  - platform: adc
+    id: battery_adc
+    pin: A0
+    name: "Battery ADC Raw"
+    update_interval: 21600s
+    internal: false
+    filters:
+      - median:
+          window_size: 5
+          send_every: 1
+          send_first_at: 1
+
+  - platform: template
+    id: battery_voltage
+    name: "Battery Voltage"
+    unit_of_measurement: "V"
+    device_class: voltage
+    state_class: measurement
+    update_interval: 21600s
+    lambda: |-
+      // Multiply by the combined divider compensation factor (external divider plus wemos d1 mini internal).
+      return id(battery_adc).state * 5.07;
+
+  - platform: template
+    id: battery_percentage
+    name: "Battery Percentage"
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    update_interval: 21600s
+    lambda: |-
+      float v = id(battery_voltage).state;
+
+      const float v_full = 4.20;   // full
+      const float v_empty = 3.00;  // empty
+
+      if (v > v_full) v = v_full;
+      else if (v < v_empty) v = v_empty;
+
+      return (v - v_empty) / (v_full - v_empty) * 100.0;
+    filters:
+      - exponential_moving_average:
+          alpha: 0.1
+          send_every: 1
