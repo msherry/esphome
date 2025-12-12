@@ -5,7 +5,7 @@ packages:
   device_base: !include _common.yaml
 
 substitutions:
-  update_interval: 1800s
+  update_interval: 3600s
 
 wifi:
   power_save_mode: HIGH
@@ -110,7 +110,7 @@ sensor:
     pin: A0
     name: "Battery ADC Raw"
     update_interval: ${update_interval}
-    internal: false
+    disabled_by_default: true
     filters:
       - median:
           window_size: 5
@@ -125,8 +125,9 @@ sensor:
     state_class: measurement
     update_interval: ${update_interval}
     lambda: |-
-      // Multiply by the combined divider compensation factor (external divider plus wemos d1 mini internal).
-      return id(battery_adc).state * 5.07;
+      // Multiply by the combined divider compensation factor (external 100k plus wemos d1 mini 220k/100k divider).
+      // Vbat = Vadc * (100k + 220k + 420k) / 100k = Vadc * 4.2
+      return id(battery_adc).state * 4.2;
 
   - platform: template
     id: battery_percentage
@@ -138,6 +139,7 @@ sensor:
     lambda: |-
       float v = id(battery_voltage).state;
 
+      // Clamp measurable range
       const float v_full = 4.20;   // full
       const float v_empty = 3.00;  // empty
 
