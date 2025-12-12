@@ -1,3 +1,6 @@
+substitutions:
+  update_interval: 600s
+
 esphome:
   name: $name
   # friendly_name: $friendly_name # https://community.home-assistant.io/t/how-is-friendly-name-supposed-to-behave/542570/35
@@ -56,16 +59,16 @@ text_sensor:
     ip_address:
       name: "${friendly_name} IP"
       entity_category: diagnostic
-      update_interval: 600s
+      update_interval: ${update_interval}
     ssid:
       name: "${friendly_name} SSID"
       entity_category: diagnostic
-      update_interval: 600s
+      update_interval: ${update_interval}
     bssid:
       name: "${friendly_name} BSSID"
       entity_category: diagnostic
       disabled_by_default: true
-      update_interval: 600s
+      update_interval: ${update_interval}
 
 # Exposed switches/buttons.
 button:
@@ -78,13 +81,13 @@ sensor:
   # Uptime sensor.
   - platform: uptime
     name: "${friendly_name} Uptime"
-    update_interval: 600s
+    update_interval: ${update_interval}
     entity_category: diagnostic
     disabled_by_default: true
 
   # WiFi Signal sensor.
   - platform: wifi_signal
     name: "${friendly_name} WiFi Signal"
-    update_interval: 600s
+    update_interval: ${update_interval}
     entity_category: diagnostic
     disabled_by_default: true

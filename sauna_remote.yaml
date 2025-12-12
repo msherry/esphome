@@ -4,8 +4,11 @@ esp8266:
 packages:
   device_base: !include _common.yaml
 
+substitutions:
+  update_interval: 1800s
+
 wifi:
-  power_save_mode: LIGHT
+  power_save_mode: HIGH
 
 output:
   - platform: esp8266_pwm
@@ -106,7 +109,7 @@ sensor:
     id: battery_adc
     pin: A0
     name: "Battery ADC Raw"
-    update_interval: 21600s
+    update_interval: ${update_interval}
     internal: false
     filters:
       - median:
@@ -120,7 +123,7 @@ sensor:
     unit_of_measurement: "V"
     device_class: voltage
     state_class: measurement
-    update_interval: 21600s
+    update_interval: ${update_interval}
     lambda: |-
       // Multiply by the combined divider compensation factor (external divider plus wemos d1 mini internal).
       return id(battery_adc).state * 5.07;
@@ -131,7 +134,7 @@ sensor:
     unit_of_measurement: "%"
     device_class: battery
     state_class: measurement
-    update_interval: 21600s
+    update_interval: ${update_interval}
     lambda: |-
       float v = id(battery_voltage).state;
 
