@@ -20,6 +20,7 @@ esphome:
 
 wifi:
   power_save_mode: none
+  output_power: 8.5dB
 
 output:
   - platform: ledc
