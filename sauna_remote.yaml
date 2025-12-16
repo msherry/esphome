@@ -2,7 +2,7 @@ esp32:
   board: nologo_esp32c3_super_mini
   variant: esp32c3
   framework:
-    type: arduino
+    type: esp-idf
 
 packages:
   device_base: !include _common.yaml
@@ -66,6 +66,14 @@ light:
             off_length: 200ms
           update_interval: 400ms
 
+switch:
+  - platform: homeassistant
+    name: "Sauna relay template switch"
+    id: sauna_outlet_switch
+    entity_id: "switch.sauna_outlet_switch_0"
+    disabled_by_default: false
+    internal: false
+
 binary_sensor:
   - platform: gpio
     name: "Button"
@@ -80,10 +88,7 @@ binary_sensor:
       # - logger.log:
       #     level: INFO
       #     format: "Button pressed"
-      - homeassistant.action:
-          action: switch.toggle
-          data:
-            entity_id: "switch.sauna_outlet_switch_0"
+      - switch.toggle: sauna_outlet_switch
 
 text_sensor:
   - platform: homeassistant
