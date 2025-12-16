@@ -1,5 +1,8 @@
-esp8266:
-  board: d1_mini
+esp32:
+  board: nologo_esp32c3_super_mini
+  variant: esp32c3
+  framework:
+    type: arduino
 
 packages:
   device_base: !include _common.yaml
@@ -16,21 +19,21 @@ esphome:
         state: 0
 
 wifi:
-  power_save_mode: HIGH
+  power_save_mode: none
 
 output:
-  - platform: esp8266_pwm
-    pin: D5
+  - platform: ledc
+    pin: GPIO1
     frequency: 1000 Hz
     id: red_output
     inverted: true
-  - platform: esp8266_pwm
-    pin: D6
+  - platform: ledc
+    pin: GPIO3
     frequency: 1000 Hz
     id: green_output
     inverted: true
-  - platform: esp8266_pwm
-    pin: D7
+  - platform: ledc
+    pin: GPIO4
     frequency: 1000 Hz
     id: blue_output
     inverted: true
@@ -66,7 +69,7 @@ binary_sensor:
   - platform: gpio
     name: "Button"
     pin:
-      number: D2
+      number: GPIO10
       mode: INPUT_PULLUP
       inverted: true          # pressed = ON when wired to GND + pull-up
     filters:
@@ -85,7 +88,7 @@ text_sensor:
   - platform: homeassistant
     name: "Sauna state"
     entity_id: sensor.sauna_state
-    update_interval: 3600s
+    # update_interval: 3600s
     internal: true
     on_value:
       then:
@@ -116,7 +119,7 @@ text_sensor:
 sensor:
   - platform: adc
     id: battery_adc
-    pin: A0
+    pin: GPIO0
     name: "Battery ADC Raw"
     update_interval: ${update_interval}
     disabled_by_default: true
