@@ -37,12 +37,11 @@ api:
     - delay: 5s
     - if:
         condition:
-          and:
-            lambda: |-
-              // Mega hack, since the is_connected flag is true on non-HA
-              // connections, in contravention of the docs -- we ignore
-              // connections from "ESPHome Logs 2025.12.0" and similar
-              return id(api_id).is_connected(true) && client_info.find("Logs") == -1;
+          lambda: |-
+            // Mega hack, since the state_subscription_only flag is true on non-HA
+            // connections, in contravention of the docs -- we ignore
+            // connections from "ESPHome Logs 2025.12.0" and similar
+            return id(api_id).is_connected(true) && client_info.find("Logs") == -1;
         then:
           - logger.log:
               level: DEBUG
@@ -50,20 +49,20 @@ api:
               args: ["client_info.c_str()", "client_address.c_str()"]
           # Use the stored wakeup reason, then clear it out to avoid issues with HA flapping
           - lambda: |-
-              if (id(wakeup_cause_preserved).state == float(ESP_SLEEP_WAKEUP_TIMER)) {
+              if (id(wakeup_cause).state == float(ESP_SLEEP_WAKEUP_TIMER)) {
                 ESP_LOGD("sauna_remote", "Woke up via timer");
-              } else if (id(wakeup_cause_preserved).state == float(ESP_SLEEP_WAKEUP_GPIO)) {
+              } else if (id(wakeup_cause).state == float(ESP_SLEEP_WAKEUP_GPIO)) {
                 ESP_LOGD("sauna_remote", "Woke up via GPIO, toggling sauna relay");
                 id(sauna_outlet_switch).toggle();
               } else {
                 ESP_LOGD("sauna_remote", "Woke up for some other reason (not %d or %d): %d",
-                         ESP_SLEEP_WAKEUP_TIMER, ESP_SLEEP_WAKEUP_GPIO, id(wakeup_cause_preserved).state);
+                         ESP_SLEEP_WAKEUP_TIMER, ESP_SLEEP_WAKEUP_GPIO, id(wakeup_cause).state);
               }
           - logger.log:
               level: DEBUG
               format: "Clearing stored wakeup reason..."
           - sensor.template.publish:
-              id: wakeup_cause_preserved
+              id: wakeup_cause
               state: -1
           - logger.log:
               level: DEBUG
