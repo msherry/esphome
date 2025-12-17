@@ -38,8 +38,8 @@ api:
     - if:
         condition:
           lambda: |-
-            // Mega hack, since the state_subscription_only flag is true on non-HA
-            // connections, in contravention of the docs -- we ignore
+            // Mega hack, since the state_subscription_only flag is true on
+            // non-HA connections, in contravention of the docs -- we ignore
             // connections from "ESPHome Logs 2025.12.0" and similar
             return id(api_id).is_connected(true) && client_info.find("Logs") == -1;
         then:
@@ -81,11 +81,10 @@ deep_sleep:
   run_duration: 10min
   sleep_duration: 10min
   wakeup_pin:
+    # Tied to GPIO10, which is a pushbutton, and pulled high via *external*
+    # resistor (so the voltage doesn't disappear on sleep)
     number: GPIO5
     inverted: true
-    # mode: INPUT_PULLUP
-    # allow_other_uses: True
-
 
 output:
   - platform: ledc
@@ -140,13 +139,11 @@ script:
           condition:
             lambda: return id(sauna_outlet_switch).state;
           then:
-            # Switch active, disable sleep
             - logger.log:
                 level: DEBUG
                 format: "Outlet active, preventing sleep"
             - deep_sleep.prevent: deep_sleep_1
           else:
-            # Switch inactive, allow sleep, then sleep
             - logger.log:
                 level: DEBUG
                 format: "Outlet inactive, allowing sleep"
@@ -184,12 +181,7 @@ text_sensor:
     internal: true
     on_value:
       then:
-        # - logger.log:
-        #     level: INFO
-        #     format: "Remote sauna state received from HA: %s"
-        #     args: ["x.c_str()"]
         - lambda: |-
-            ESP_LOGI("sauna", "State changed: %s", x.c_str());
             auto call = id(remote_light).turn_on().set_effect("None");
             if (x == "Off") {
               // Replace the call with a new one
@@ -290,10 +282,6 @@ sensor:
 
       // Original, non-interpolated formula
       // return (v - v_empty) / (v_full - v_empty) * 100.0;
-    filters:
-      - exponential_moving_average:
-          alpha: 0.1
-          send_every: 1
 
   - platform: template
     name: "Wakeup Cause"
