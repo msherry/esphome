@@ -12,13 +12,16 @@ substitutions:
 
 esphome:
   on_boot:
-    # Pulse the switch so the user knows we're doing something
+    # If we woke up due to a button press, pulse the switch so the user knows we're doing something
     - lambda: |-
-        id(remote_light).turn_on().set_rgb(0.0, 0.0, 0.0).set_effect("Fast pulse").perform();
-    # Save the wakeup reason upon first wakeup
+        if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_GPIO) {
+          id(remote_light).turn_on().set_rgb(0.0, 0.0, 0.0).set_effect("Fast pulse").perform();
+        }
+    # Collect the wakeup reason upon first wakeup
     - sensor.template.publish:
         id: wakeup_cause
         state: !lambda return esp_sleep_get_wakeup_cause();
+    # Duplicate it elsewhere so that we can munge it
     - sensor.template.publish:
         id: wakeup_cause_preserved
         state: !lambda return id(wakeup_cause).state;
@@ -27,7 +30,6 @@ wifi:
   power_save_mode: none
   output_power: 8.5dB           # helps with wifi auth errors, somehow
   fast_connect: true
-  # on_connect:
 
 api:
   on_client_connected:
@@ -40,7 +42,6 @@ api:
               // Mega hack, since the is_connected flag is true on non-HA
               // connections, in contravention of the docs -- we ignore
               // connections from "ESPHome Logs 2025.12.0" and similar
-
               return id(api_id).is_connected(true) && client_info.find("Logs") == -1;
         then:
           - logger.log:
@@ -216,11 +217,8 @@ sensor:
     update_interval: never
     disabled_by_default: true
     attenuation: 12db
-    filters:
-      - median:
-          window_size: 5
-          send_every: 1
-          send_first_at: 1
+    sampling_mode: avg
+    samples: 16
     on_value:
       component.update: battery_voltage
 
