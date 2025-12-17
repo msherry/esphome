@@ -12,15 +12,80 @@ substitutions:
 
 esphome:
   on_boot:
-    # work around https://github.com/esphome/feature-requests/issues/607
-    # set a default value for the skip counter, otherwise it's nan
+    # Pulse the switch so the user knows we're doing something
+    - lambda: |-
+        id(remote_light).turn_on().set_rgb(0.0, 0.0, 0.0).set_effect("Fast pulse").perform();
+    # Save the wakeup reason upon first wakeup
     - sensor.template.publish:
-        id: battery_percentage_skips
-        state: 0
+        id: wakeup_cause
+        state: !lambda return esp_sleep_get_wakeup_cause();
+    - sensor.template.publish:
+        id: wakeup_cause_preserved
+        state: !lambda return id(wakeup_cause).state;
 
 wifi:
   power_save_mode: none
-  output_power: 8.5dB
+  output_power: 8.5dB           # helps with wifi auth errors, somehow
+  fast_connect: true
+  # on_connect:
+
+api:
+  on_client_connected:
+    # Wait for home assistant to fully subscribe
+    - delay: 5s
+    - if:
+        condition:
+          and:
+            lambda: |-
+              // Mega hack, since the is_connected flag is true on non-HA
+              // connections, in contravention of the docs -- we ignore
+              // connections from "ESPHome Logs 2025.12.0" and similar
+
+              return id(api_id).is_connected(true) && client_info.find("Logs") == -1;
+        then:
+          - logger.log:
+              level: DEBUG
+              format: "HomeAssistant client %s connected to API with IP %s"
+              args: ["client_info.c_str()", "client_address.c_str()"]
+          # Use the stored wakeup reason, then clear it out to avoid issues with HA flapping
+          - lambda: |-
+              if (id(wakeup_cause_preserved).state == float(ESP_SLEEP_WAKEUP_TIMER)) {
+                ESP_LOGD("sauna_remote", "Woke up via timer");
+              } else if (id(wakeup_cause_preserved).state == float(ESP_SLEEP_WAKEUP_GPIO)) {
+                ESP_LOGD("sauna_remote", "Woke up via GPIO, toggling sauna relay");
+                id(sauna_outlet_switch).toggle();
+              } else {
+                ESP_LOGD("sauna_remote", "Woke up for some other reason (not %d or %d): %d",
+                         ESP_SLEEP_WAKEUP_TIMER, ESP_SLEEP_WAKEUP_GPIO, id(wakeup_cause_preserved).state);
+              }
+          - logger.log:
+              level: DEBUG
+              format: "Clearing stored wakeup reason..."
+          - sensor.template.publish:
+              id: wakeup_cause_preserved
+              state: -1
+          - logger.log:
+              level: DEBUG
+              format: "Updating adc sensor..."
+          - component.update: battery_adc
+        else:
+          - logger.log:
+              level: DEBUG
+              format: "NON HomeAssistant client %s connected to API with IP %s"
+              args: ["client_info.c_str()", "client_address.c_str()"]
+
+
+deep_sleep:
+  id: deep_sleep_1
+  # give enough time for HA to connect -- once connected, we will manually sleep
+  run_duration: 10min
+  sleep_duration: 10min
+  wakeup_pin:
+    number: GPIO5
+    inverted: true
+    # mode: INPUT_PULLUP
+    # allow_other_uses: True
+
 
 output:
   - platform: ledc
@@ -66,13 +131,38 @@ light:
             off_length: 200ms
           update_interval: 400ms
 
+script:
+  - id: handle_outlet_update
+    # Allow later invocations to cancel earlier ones
+    mode: restart
+    then:
+      - if:
+          condition:
+            lambda: return id(sauna_outlet_switch).state;
+          then:
+            # Switch active, disable sleep
+            - logger.log:
+                level: DEBUG
+                format: "Outlet active, preventing sleep"
+            - deep_sleep.prevent: deep_sleep_1
+          else:
+            # Switch inactive, allow sleep, then sleep
+            - logger.log:
+                level: DEBUG
+                format: "Outlet inactive, allowing sleep"
+            - deep_sleep.allow: deep_sleep_1
+            - delay: 15s
+            - deep_sleep.enter: deep_sleep_1
+
 switch:
   - platform: homeassistant
     name: "Sauna relay template switch"
     id: sauna_outlet_switch
     entity_id: "switch.sauna_outlet_switch_0"
-    disabled_by_default: false
-    internal: false
+    internal: true
+    on_state:
+      - script.execute: handle_outlet_update
+
 
 binary_sensor:
   - platform: gpio
@@ -85,16 +175,12 @@ binary_sensor:
       - delayed_on: 20ms
       - delayed_off: 500ms
     on_press:
-      # - logger.log:
-      #     level: INFO
-      #     format: "Button pressed"
       - switch.toggle: sauna_outlet_switch
 
 text_sensor:
   - platform: homeassistant
     name: "Sauna state"
     entity_id: sensor.sauna_state
-    # update_interval: 3600s
     internal: true
     on_value:
       then:
@@ -127,13 +213,16 @@ sensor:
     id: battery_adc
     pin: GPIO0
     name: "Battery ADC Raw"
-    update_interval: ${update_interval}
+    update_interval: never
     disabled_by_default: true
+    attenuation: 12db
     filters:
       - median:
           window_size: 5
           send_every: 1
           send_first_at: 1
+    on_value:
+      component.update: battery_voltage
 
   - platform: template
     id: battery_voltage
@@ -141,11 +230,16 @@ sensor:
     unit_of_measurement: "V"
     device_class: voltage
     state_class: measurement
-    update_interval: ${update_interval}
+    update_interval: never
     lambda: |-
-      // Multiply by the combined divider compensation factor (external 100k plus wemos d1 mini 220k/100k divider).
-      // Vbat = Vadc * (100k + 220k + 420k) / 100k = Vadc * 4.2
-      return id(battery_adc).state * 4.2;
+      // Account for the 470k/330k voltage divider (Vbat = Vadc * (470k + 330k)/470k)
+      return id(battery_adc).state * 1.702;
+    filters:
+      - clamp:
+          min_value: 2.8
+          max_value: 4.25
+    on_value:
+      component.update: battery_percentage
 
   - platform: template
     id: battery_percentage
@@ -153,7 +247,7 @@ sensor:
     unit_of_measurement: "%"
     device_class: battery
     state_class: measurement
-    update_interval: ${update_interval}
+    update_interval: never
     lambda: |-
       float v = id(battery_voltage).state;
 
@@ -200,18 +294,21 @@ sensor:
       // Original, non-interpolated formula
       // return (v - v_empty) / (v_full - v_empty) * 100.0;
     filters:
-      # work around https://github.com/esphome/feature-requests/issues/607
-      # increment a skip counter, this skips the first N measurements
-      - lambda: |-
-          auto s = id(battery_percentage_skips);
-          if (s->state > 1) { return x; }
-          else { s->publish_state(s->state+1); return {}; }
-
       - exponential_moving_average:
           alpha: 0.1
           send_every: 1
 
   - platform: template
-    id: battery_percentage_skips
-    internal: true
+    name: "Wakeup Cause"
+    id: wakeup_cause
+    disabled_by_default: true
+    # internal: true
+    accuracy_decimals: 0
+
+
+  - platform: template
+    name: "Wakeup Cause preserved"
+    id: wakeup_cause_preserved
+    disabled_by_default: true
+    # internal: true
     accuracy_decimals: 0

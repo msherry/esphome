@@ -13,6 +13,7 @@ logger:
 api:
   # passwords are deprecated -- encryption keys are now preferred
   # password: ""
+  id: api_id
   encryption:
     key: !secret api_encryption_key
 
@@ -60,16 +61,13 @@ text_sensor:
     ip_address:
       name: "${friendly_name} IP"
       entity_category: diagnostic
-      update_interval: ${update_interval}
     ssid:
       name: "${friendly_name} SSID"
       entity_category: diagnostic
-      update_interval: ${update_interval}
     bssid:
       name: "${friendly_name} BSSID"
       entity_category: diagnostic
       disabled_by_default: true
-      update_interval: ${update_interval}
 
 # Exposed switches/buttons.
 button:
