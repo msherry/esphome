@@ -79,7 +79,7 @@ deep_sleep:
   id: deep_sleep_1
   # give enough time for HA to connect -- once connected, we will manually sleep
   run_duration: 10min
-  sleep_duration: 10min
+  sleep_duration: 60min
   wakeup_pin:
     # Tied to GPIO10, which is a pushbutton, and pulled high via *external*
     # resistor (so the voltage doesn't disappear on sleep)
