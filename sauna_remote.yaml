@@ -7,8 +7,11 @@ esp32:
 packages:
   device_base: !include _common.yaml
 
-substitutions:
-  update_interval: 3600s
+globals:
+  id: battery_percentage_global
+  type: float
+  restore_value: yes
+  initial_value: '0'
 
 esphome:
   on_boot:
@@ -228,15 +231,16 @@ sensor:
           min_value: 2.8
           max_value: 4.25
     on_value:
-      component.update: battery_percentage
+      component.update: battery_percentage_raw
 
   - platform: template
-    id: battery_percentage
-    name: "Battery Percentage"
+    id: battery_percentage_raw
+    name: "Battery Percentage raw"
     unit_of_measurement: "%"
     device_class: battery
     state_class: measurement
     update_interval: never
+    disabled_by_default: true
     lambda: |-
       float v = id(battery_voltage).state;
 
@@ -282,6 +286,30 @@ sensor:
 
       // Original, non-interpolated formula
       // return (v - v_empty) / (v_full - v_empty) * 100.0;
+    on_value:
+      component.update: battery_percentage
+
+  - platform: template
+    id: battery_percentage
+    name: "Battery Percentage"
+    unit_of_measurement: "%"
+    device_class: battery
+    state_class: measurement
+    update_interval: never
+    lambda: |-
+      auto raw = id(battery_percentage_raw).state;
+      auto acc = id(battery_percentage_global);
+      auto cur = 0.0;
+
+      if (raw > acc || acc / raw > 1.1) {
+        // Over 10% difference or an increase, replace accumulator with new value
+        cur = raw;
+      } else {
+        // Exponential moving average
+        cur = 0.75 * acc + 0.25 * raw;
+      }
+      id(battery_percentage_global) = cur;
+      return cur;
 
   - platform: template
     name: "Wakeup Cause"
@@ -289,7 +317,6 @@ sensor:
     disabled_by_default: true
     # internal: true
     accuracy_decimals: 0
-
 
   - platform: template
     name: "Wakeup Cause preserved"
