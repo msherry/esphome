@@ -28,8 +28,6 @@ esphome:
     - sensor.template.publish:
         id: wakeup_cause_preserved
         state: !lambda return id(wakeup_cause).state;
-    # Update battery sensors
-    - component.update: battery_adc
 
 wifi:
   power_save_mode: none
@@ -166,6 +164,10 @@ script:
             - sensor.template.publish:
                 id: wakeup_cause
                 state: -1
+            - logger.log:
+                level: DEBUG
+                format: "Reading ADC..."
+            - component.update: battery_adc
           else:
             - logger.log:
                 level: DEBUG
