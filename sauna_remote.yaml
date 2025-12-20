@@ -28,6 +28,8 @@ esphome:
     - sensor.template.publish:
         id: wakeup_cause_preserved
         state: !lambda return id(wakeup_cause).state;
+    # Update battery sensors
+    - component.update: battery_adc
 
 wifi:
   power_save_mode: none
@@ -50,27 +52,11 @@ api:
               level: DEBUG
               format: "HomeAssistant client %s connected to API with IP %s"
               args: ["client_info.c_str()", "client_address.c_str()"]
-          # Use the stored wakeup reason, then clear it out to avoid issues with HA flapping
-          - lambda: |-
-              if (id(wakeup_cause).state == float(ESP_SLEEP_WAKEUP_TIMER)) {
-                ESP_LOGD("sauna_remote", "Woke up via timer");
-              } else if (id(wakeup_cause).state == float(ESP_SLEEP_WAKEUP_GPIO)) {
-                ESP_LOGD("sauna_remote", "Woke up via GPIO, toggling sauna relay");
-                id(sauna_outlet_switch).toggle();
-              } else {
-                ESP_LOGD("sauna_remote", "Woke up for some other reason (not %d or %d): %d",
-                         ESP_SLEEP_WAKEUP_TIMER, ESP_SLEEP_WAKEUP_GPIO, id(wakeup_cause).state);
-              }
-          - logger.log:
-              level: DEBUG
-              format: "Clearing stored wakeup reason..."
-          - sensor.template.publish:
-              id: wakeup_cause
-              state: -1
-          - logger.log:
-              level: DEBUG
-              format: "Updating adc sensor..."
-          - component.update: battery_adc
+
+          # If we haven't handled the possible button press that woke us by now
+          # (hopefully we did it in the callback for sensor.sauna_state), do it
+          # now.
+          - script.execute: toggle_outlet_on_button_wake
         else:
           - logger.log:
               level: DEBUG
@@ -154,6 +140,37 @@ script:
             - delay: 15s
             - deep_sleep.enter: deep_sleep_1
 
+  - id: toggle_outlet_on_button_wake
+    # Only allow one execution at a time, to ensure we only toggle once.
+    mode: queued
+    then:
+      - if:
+          condition:
+            # Has boot toggling already been handled?
+            lambda: return id(wakeup_cause).state != -1;
+          then:
+            # Use the stored wakeup reason, then clear it out to avoid issues with HA flapping
+            - lambda: |-
+                if (id(wakeup_cause).state == float(ESP_SLEEP_WAKEUP_TIMER)) {
+                  ESP_LOGD("sauna_remote", "Woke up via timer");
+                } else if (id(wakeup_cause).state == float(ESP_SLEEP_WAKEUP_GPIO)) {
+                  ESP_LOGD("sauna_remote", "Woke up via GPIO, toggling sauna relay");
+                  id(sauna_outlet_switch).toggle();
+                } else {
+                  ESP_LOGD("sauna_remote", "Woke up for some other reason (not %d or %d): %d",
+                           ESP_SLEEP_WAKEUP_TIMER, ESP_SLEEP_WAKEUP_GPIO, id(wakeup_cause).state);
+                }
+            - logger.log:
+                level: DEBUG
+                format: "Clearing stored wakeup reason..."
+            - sensor.template.publish:
+                id: wakeup_cause
+                state: -1
+          else:
+            - logger.log:
+                level: DEBUG
+                format: "Already executed boot toggle script, doing nothing"
+
 switch:
   - platform: homeassistant
     name: "Sauna relay template switch"
@@ -201,7 +218,13 @@ text_sensor:
               ESP_LOGW("sauna", "Unknown state: %s", x.c_str());
               call.set_rgb(1.0, 0.2, 0.0).set_effect("Hyper pulse");
             }
+            // Activate the chosen light effect
             call.perform();
+
+            // Check if we booted up in response to a button press and execute
+            // the action (done here to avoid light staying in OFF state too
+            // long after receiving HA connection).
+            id(toggle_outlet_on_button_wake).execute();
 
 sensor:
   - platform: adc
