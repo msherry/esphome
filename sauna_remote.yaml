@@ -322,17 +322,18 @@ sensor:
     state_class: measurement
     update_interval: never
     lambda: |-
-      auto raw = id(battery_percentage_raw).state;
-      auto acc = id(battery_percentage_global);
-      auto cur = 0.0;
+      float raw = id(battery_percentage_raw).state;
+      float acc = id(battery_percentage_global);
+      float cur = 0.0;
+      float alpha = 0.25;
 
       if (raw > acc || acc / raw > 1.1) {
-        // Over 10% difference or an increase, replace accumulator with new value
-        cur = raw;
-      } else {
-        // Exponential moving average
-        cur = 0.75 * acc + 0.25 * raw;
+        // Over 10% difference or an increase, higher alpha value
+        alpha = 0.5;
+        ESP_LOGI("sauna_remote", "Using higher α %.02f for raw: %.02f  acc: %.02f", alpha, raw, acc);
       }
+      // Exponential moving average
+      cur = (1-alpha) * acc + alpha * raw;
       id(battery_percentage_global) = cur;
       return cur;
 
