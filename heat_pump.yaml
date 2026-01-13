@@ -1,5 +1,8 @@
 # https://github.com/echavet/MitsubishiCN105ESPHome
 
+preferences:
+  flash_write_interval: 15min
+
 # Compile with these filled in -- e.g.
 # esphome -s name 'living_room_56' -s area 'Living room 56' -s friendly_name 'Living Room 56' run heat_pump.yaml
 substitutions:
@@ -10,6 +13,7 @@ substitutions:
 
 esp8266:
   board: esp01_1m
+  restore_from_flash: true
 
 packages:
   device_base: !include _common.yaml
@@ -48,13 +52,38 @@ sensor:
             format: "Remote temperature received from HA: %.1f C"
             args: ["x"]
         - lambda: "id(hp).set_remote_temperature(x);"
+  # Count running hours
+  - platform: duty_time
+    id: dt
+    name: "HVAC duty time"
+    lambda: "return id(hp).mode != CLIMATE_MODE_OFF;"
+    # Persist across reboots
+    restore: true
+
+binary_sensor:
+  # Alert when filter clean is necessary
+  - platform: template
+    id: filter_dirty
+    name: "Filter clean required"
+    # 6 months @ 8 hours/day
+    lambda: |-
+      bool required = id(dt).state > 86400;
+      id(filter_dirty).set_icon(required ? "mdi:alert" : "mdi:check-circle");
+      return required;
+
+button:
+  - platform: template
+    name: "Reset runtime"
+    on_press:
+      - then:
+          - sensor.duty_time.reset: dt
 
 # Climate entity configuration
 climate:
   - platform: cn105
     id: hp
     name: "${friendly_name} heat pump"
-    icon: mdi:heat-pump
+    icon: "mdi:heat-pump"
     # visual:
     #   min_temperature: 60 # Adjust to your unit's min temp. SmartSet units can go to 10C for heating
     #   max_temperature: 85
@@ -64,48 +93,48 @@ climate:
 
     # Fahrenheit compatibility mode - uses Mitsubishi's "custom" unit conversions, set to
     # "true" for better support of Fahrenheit units in HomeAssistant
-    fahrenheit_compatibility: false
+    fahrenheit_compatibility: "true"
     # Timeout and communication settings
     remote_temperature_timeout: 30min
     update_interval: 15s    # update interval can be adjusted after a first run and logs monitoring
     debounce_delay : 100ms
     # Various optional sensors, not all sensors are supported by all heatpumps
     compressor_frequency_sensor:
-      name: Compressor Frequency
+      name: "Compressor Frequency"
       entity_category: diagnostic
       disabled_by_default: true
     outside_air_temperature_sensor:
-      name: Outside Air Temp
+      name: "Outside Air Temp"
       disabled_by_default: true
     vertical_vane_select:
-      name: Vertical Vane
+      name: "Vertical Vane"
       disabled_by_default: false
     horizontal_vane_select:
-      name: Horizontal Vane
+      name: "Horizontal Vane"
       disabled_by_default: true
     isee_sensor:
-      name: ISEE Sensor
+      name: "ISEE Sensor"
       disabled_by_default: true
     stage_sensor:
-      name: Stage
+      name: "Stage"
       entity_category: diagnostic
       disabled_by_default: true
     sub_mode_sensor:
-      name: Sub Mode
+      name: "Sub Mode"
       entity_category: diagnostic
       disabled_by_default: true
     auto_sub_mode_sensor:
-      name: Auto Sub Mode
+      name: "Auto Sub Mode"
       entity_category: diagnostic
       disabled_by_default: true
     input_power_sensor:
-      name: Input Power
+      name: "Input Power"
       disabled_by_default: true
     kwh_sensor:
-      name: Energy Usage
+      name: "Energy Usage"
       disabled_by_default: true
     runtime_hours_sensor:
-      name: Runtime Hours
+      name: "Runtime Hours"
       entity_category: diagnostic
       disabled_by_default: true
 
