@@ -27,6 +27,16 @@ uart:
 external_components:
   - source: github://echavet/MitsubishiCN105ESPHome
 
+globals:
+  - id: last_filter_clean_runtime_hours
+    type: float
+    restore_value: yes
+    initial_value: '0'
+
+  - id: last_filter_clean_timestamp
+    type: int64_t
+    restore_value: yes
+    initial_value: '0'
 
 sensor:
   - platform: homeassistant
@@ -52,31 +62,93 @@ sensor:
             format: "Remote temperature received from HA: %.1f C"
             args: ["x"]
         - lambda: "id(hp).set_remote_temperature(x);"
-  # Count running hours
+  # Some models (ceiling cassette) update runtime_hours_sensor, but others
+  # (wall mounted) do not, so we have to do it ourselves.
   - platform: duty_time
     id: dt
     name: "HVAC duty time"
     lambda: "return id(hp).mode != CLIMATE_MODE_OFF;"
     # Persist across reboots
     restore: true
+  - platform: template
+    id: running_hours
+    name: "Running hours since filter clean"
+    device_class: duration
+    unit_of_measurement: "h"
+    lambda: |-
+      // Global variable, does not use `.state`
+      float last_filter_clean_hours = id(last_filter_clean_runtime_hours);
+      float current_runtime_hours = id(dt).state / 3600.0;
+      return current_runtime_hours - last_filter_clean_hours;
+
+text_sensor:
+  - platform: template
+    id: filter_clean_timestamp
+    name: "Last filter clean"
+    lambda: |-
+      if (id(last_filter_clean_timestamp) == 0 || !id(homeassistant_time).now().is_valid()) {
+        return std::string("Never");
+      }
+
+      int64_t now = id(homeassistant_time).now().timestamp;
+      int64_t delta = now - id(last_filter_clean_timestamp);
+
+      if (delta < 60) {
+        return std::string("Just now");
+      }
+
+      if (delta < 3600) {
+        int mins = delta / 60;
+        return std::to_string(mins) + " minute" + (mins == 1 ? "" : "s") + " ago";
+      }
+
+      if (delta < 86400) {
+        int hours = delta / 3600;
+        return std::to_string(hours) + " hour" + (hours == 1 ? "" : "s") + " ago";
+      }
+
+      if (delta < 86400LL * 30) {
+        int days = delta / 86400;
+        return std::to_string(days) + " day" + (days == 1 ? "" : "s") + " ago";
+      }
+
+      if (delta < 86400LL * 365) {
+        int months = delta / (86400LL * 30);
+        return std::to_string(months) + " month" + (months == 1 ? "" : "s") + " ago";
+      }
+
+      int years = delta / (86400LL * 365);
+      return std::to_string(years) + " year" + (years == 1 ? "" : "s") + " ago";
 
 binary_sensor:
   # Alert when filter clean is necessary
   - platform: template
     id: filter_dirty
     name: "Filter clean required"
-    # 6 months @ 8 hours/day
+    device_class: problem
+    # 3 months of running 8 hours/day, or six months since last clean
     lambda: |-
-      bool required = id(dt).state > 86400;
-      id(filter_dirty).set_icon(required ? "mdi:alert" : "mdi:check-circle");
-      return required;
+      if (id(running_hours).state > 720) return true;
+
+      int64_t now = id(homeassistant_time).now().timestamp;
+      int64_t delta = now - id(last_filter_clean_timestamp);
+
+      return delta > (6 * 30 * 24 * 3600);
 
 button:
   - platform: template
-    name: "Reset runtime"
+    name: "Reset filter"
     on_press:
       - then:
-          - sensor.duty_time.reset: dt
+          - lambda: |-
+              // Update running hours
+              float runtime_hours = id(dt).state / 3600.0;
+              id(last_filter_clean_runtime_hours) = runtime_hours;
+
+              // Update datetime of clean
+              if (id(homeassistant_time).now().is_valid()) {
+                id(last_filter_clean_timestamp) = id(homeassistant_time).now().timestamp;
+              }
 
 # Climate entity configuration
 climate:
