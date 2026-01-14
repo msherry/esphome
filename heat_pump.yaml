@@ -83,42 +83,16 @@ sensor:
 
 text_sensor:
   - platform: template
-    id: filter_clean_timestamp
-    name: "Last filter clean"
+    id: filter_last_reset
+    name: Filter last reset
+    device_class: timestamp
     lambda: |-
-      if (id(last_filter_clean_timestamp) == 0 || !id(homeassistant_time).now().is_valid()) {
-        return std::string("Never");
-      }
+      time_t ts = id(last_filter_clean_timestamp);
+      struct tm *t = localtime(&ts);
 
-      int64_t now = id(homeassistant_time).now().timestamp;
-      int64_t delta = now - id(last_filter_clean_timestamp);
-
-      if (delta < 60) {
-        return std::string("Just now");
-      }
-
-      if (delta < 3600) {
-        int mins = delta / 60;
-        return std::to_string(mins) + " minute" + (mins == 1 ? "" : "s") + " ago";
-      }
-
-      if (delta < 86400) {
-        int hours = delta / 3600;
-        return std::to_string(hours) + " hour" + (hours == 1 ? "" : "s") + " ago";
-      }
-
-      if (delta < 86400LL * 30) {
-        int days = delta / 86400;
-        return std::to_string(days) + " day" + (days == 1 ? "" : "s") + " ago";
-      }
-
-      if (delta < 86400LL * 365) {
-        int months = delta / (86400LL * 30);
-        return std::to_string(months) + " month" + (months == 1 ? "" : "s") + " ago";
-      }
-
-      int years = delta / (86400LL * 365);
-      return std::to_string(years) + " year" + (years == 1 ? "" : "s") + " ago";
+      char buffer[32];
+      strftime(buffer, sizeof(buffer), "%Y-%m-%dT%H:%M:%S%z", t);
+      return std::string(buffer);
 
 binary_sensor:
   # Alert when filter clean is necessary
