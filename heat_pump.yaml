@@ -67,6 +67,7 @@ sensor:
   - platform: duty_time
     id: dt
     name: "HVAC duty time"
+    accuracy_decimals: 0
     lambda: "return id(hp).mode != CLIMATE_MODE_OFF;"
     # Persist across reboots
     restore: true
