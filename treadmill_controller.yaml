@@ -29,7 +29,7 @@ esp32_ble_tracker:
   on_ble_advertise:
     - then:
         lambda: |-
-          if (x.get_name() == ECHO) {
+          if (x.get_name() == HEARTCAST) {
             // Check if we are already connected or connecting
             if (!id(heartcast_client).connected()) {
               ESP_LOGD("heartcast", "Found HeartCast at %s! Connecting...", x.address_str().c_str());
@@ -57,6 +57,14 @@ ble_client:
       then:
         - lambda: |-
             ESP_LOGD("ble_custom", "Disconnected from HeartCast.");
+
+# TODO: display screen
+#  - connecting status indicator
+#  - live HR when connected
+# TODO: pid loop
+# TODO: CSAFE
+#  - receive/parse
+#  - encode/transmit
 
 sensor:
   - platform: ble_client
