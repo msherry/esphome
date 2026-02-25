@@ -71,7 +71,7 @@ sensor:
     type: characteristic
     ble_client_id: heartcast_client
     name: "Apple Watch Heart Rate"
-    id: apple_hr
+    id: hr_sensor
     service_uuid: '180d'        # Per BLE spec
     characteristic_uuid: '2a37' # Per BLE spec
     # descriptor_uuid: '2902'
@@ -89,3 +89,43 @@ sensor:
           return (x[0] & 0x01) ? (float)((x[2] << 8) | x[1]) : (float)x[1];
         }
         return NAN;
+
+output:
+  - platform: template
+    type: float
+    id: treadmill_speed_float
+    write_action:
+      - lambda: |-
+          // state is PID output (0.0 - 1.0). Map it to 0-16 (or a configurable max) MPH.
+          float target_mph = state * 16.0;
+          if (target_mph > 16.0) target_mph = 16.0;
+
+          ESP_LOGD("csafe", "PID setting speed to %.1f mph", target_mph);
+
+          // TODO: send the csafe here
+
+climate:
+  # Not really a thermostat -- this is the PID controller for our treadmill
+  - platform: pid
+    name: "HR Zone Controller"
+    id: zone_pid
+
+    # This must be a float between 0.0 and 1.0. Scale it to 0-15MPH (or a
+    # configurable max) when sending to the treadmill.
+    sensor: hr_sensor
+    heat_output: treadmill_speed_float
+
+    # PID tuning
+    control_parameters:
+      kp: 0.05
+      ki: 0.001
+      kd: 0.0
+
+    # Should be the center of the desired zone (e.g. 145 BPM)
+    default_target_temperature: 145
+
+    # Range settings (Treat BPM as degrees)
+    visual:
+      min_temperature: 100
+      max_temperature: 160
+      temperature_step: 1
