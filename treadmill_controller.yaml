@@ -2,6 +2,7 @@ esphome:
   includes:
     - treadmill_controller.h
 
+
 esp32:
   board: esp32dev
   variant: esp32
@@ -16,6 +17,13 @@ packages:
 
 logger:
   level: DEBUG
+
+globals:
+  id: treadmill_speed
+  type: float
+  restore_value: no
+  initial_value: '0.0'
+
 
 # Setup the UART for the MAX3232 connection
 uart:
@@ -90,42 +98,53 @@ sensor:
         }
         return NAN;
 
-output:
-  - platform: template
-    type: float
-    id: treadmill_speed_float
-    write_action:
-      - lambda: |-
-          // state is PID output (0.0 - 1.0). Map it to 0-16 (or a configurable max) MPH.
-          float target_mph = state * 16.0;
-          if (target_mph > 16.0) target_mph = 16.0;
 
-          ESP_LOGD("csafe", "PID setting speed to %.1f mph", target_mph);
+interval:
+  - interval: 15s
+    then:
+      - lambda: |-
+          const float target_hr = 140;    // TODO: configurable
+          float speed = id(treadmill_speed);
+
+          float hr = id(hr_sensor).state;
+
+          if (isnan(hr))
+            return;
+
+
+          // Within 5 BPM of target, do nothing
+          if (hr >= target_hr - 5 && hr <= target_hr + 5)
+            return;
+
+
+          if (hr >= target_hr + 20) {
+            speed -= 0.2;
+          } else if (hr >= target_hr + 10) {
+            speed -= 0.1;
+          } else if (hr <= target_hr - 20) {
+            speed += 0.2;
+          } else if (hr <= target_hr - 10) {
+            speed += 0.2;
+          }
+
+          if (speed > 12.0) speed = 12.0;
+          if (speed < 3.0) speed = 3.0;
+
+          id(set_treadmill_speed).execute(speed);
+
+script:
+  - id: set_treadmill_speed
+    parameters:
+      speed: float
+    then:
+      - lambda: |-
+          // speed is PID output speed
+
+          if (speed > 12.0) speed = 12.0;
+          if (speed < 3.0) speed = 3.0;
+          ESP_LOGD("csafe", "PID setting speed to %.1f mph", speed);
 
           // TODO: send the csafe here
 
-climate:
-  # Not really a thermostat -- this is the PID controller for our treadmill
-  - platform: pid
-    name: "HR Zone Controller"
-    id: zone_pid
-
-    # This must be a float between 0.0 and 1.0. Scale it to 0-15MPH (or a
-    # configurable max) when sending to the treadmill.
-    sensor: hr_sensor
-    heat_output: treadmill_speed_float
-
-    # PID tuning
-    control_parameters:
-      kp: 0.05
-      ki: 0.001
-      kd: 0.0
-
-    # Should be the center of the desired zone (e.g. 145 BPM)
-    default_target_temperature: 145
-
-    # Range settings (Treat BPM as degrees)
-    visual:
-      min_temperature: 100
-      max_temperature: 160
-      temperature_step: 1
+          // TODO: read back the speed from csafe?
+          id(treadmill_speed) = speed;
