@@ -5,8 +5,9 @@ esphome:
   on_boot:
     then:
       - lambda: |-
-          auto csafe = new CSAFEParser(id(treadmill_bus));
+          CSAFEParser *csafe = new CSAFEParser(id(treadmill_bus));
           App.register_component(csafe);
+          CSAFEParser::set_instance(csafe);
 
 esp32:
   board: esp32dev
@@ -172,6 +173,6 @@ script:
           if (speed < 3.0) speed = 3.0;
 
           // Send CSAFE command to set the speed
-          // This is where we'll use our CSAFE parser to send the command
-          // For now, just update the global variable
-          id(treadmill_speed) = speed;
+          if (CSAFE_GET_INSTANCE() != nullptr) {
+            CSAFE_GET_INSTANCE()->set_speed(speed);
+          }

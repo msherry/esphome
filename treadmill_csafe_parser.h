@@ -24,6 +24,9 @@ class CSAFEParser : public Component {
 public:
     explicit CSAFEParser(UARTComponent *parent) : uart_(parent) {}
 
+    static CSAFEParser *get_instance() { return instance_; }
+    static void set_instance(CSAFEParser *instance) { instance_ = instance; }
+
     void get_status() {
         send_command(CSAFE_CMD_GET_STATUS, 0, nullptr);
     }
@@ -244,6 +247,13 @@ private:
             break;
         }
     }
+
+    static CSAFEParser *instance_;
 };
+
+CSAFEParser *CSAFEParser::instance_ = nullptr;
+
+// Helper macro to get the global CSAFE parser instance
+#define CSAFE_GET_INSTANCE() (CSAFEParser::get_instance())
 
 #endif  // TREADMILL_CSAFE_PARSER_H
