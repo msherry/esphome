@@ -23,51 +23,36 @@ public:
     CSAFEParser(UARTComponent *parent) : uart_(parent) {}
 
     void set_speed(float speed_mph) {
-        // CSAFE command to set speed
-        uint8_t cmd[] = {CSAFE_PACKET_START, CSAFE_CMD_SET_SPEED, 0x02,
-                         (uint8_t)(speed_mph * 100), (uint8_t)(speed_mph * 100 >> 8),
-                         CSAFE_PACKET_END};
-        uart_->write_array(cmd, sizeof(cmd));
+        uint16_t speed_raw = (uint16_t)(speed_mph * 100);
+        uint8_t data[] = {(uint8_t)(speed_raw & 0xFF), (uint8_t)(speed_raw >> 8)};
+        send_command(CSAFE_CMD_SET_SPEED, 2, data);
     }
 
     void set_incline(float incline_percent) {
-        // CSAFE command to set incline
-        uint8_t cmd[] = {CSAFE_PACKET_START, CSAFE_CMD_SET_INCLINE, 0x02,
-                         (uint8_t)(incline_percent * 100), (uint8_t)(incline_percent * 100 >> 8),
-                         CSAFE_PACKET_END};
-        uart_->write_array(cmd, sizeof(cmd));
+        uint16_t incline_raw = (uint16_t)(incline_percent * 100);
+        uint8_t data[] = {(uint8_t)(incline_raw & 0xFF), (uint8_t)(incline_raw >> 8)};
+        send_command(CSAFE_CMD_SET_INCLINE, 2, data);
     }
 
     void set_target_heart_rate(uint16_t target_hr) {
-        // CSAFE command to set target heart rate
-        uint8_t cmd[] = {CSAFE_PACKET_START, CSAFE_CMD_SET_TARGET_HEART_RATE, 0x02,
-                         (uint8_t)(target_hr & 0xFF), (uint8_t)(target_hr >> 8),
-                         CSAFE_PACKET_END};
-        uart_->write_array(cmd, sizeof(cmd));
+        uint8_t data[] = {(uint8_t)(target_hr & 0xFF), (uint8_t)(target_hr >> 8)};
+        send_command(CSAFE_CMD_SET_TARGET_HEART_RATE, 2, data);
     }
 
     void start_workout() {
-        // CSAFE command to start workout
-        uint8_t cmd[] = {CSAFE_PACKET_START, CSAFE_CMD_START_WORKOUT, 0x00, CSAFE_PACKET_END};
-        uart_->write_array(cmd, sizeof(cmd));
+        send_command(CSAFE_CMD_START_WORKOUT, 0, nullptr);
     }
 
     void stop_workout() {
-        // CSAFE command to stop workout
-        uint8_t cmd[] = {CSAFE_PACKET_START, CSAFE_CMD_STOP_WORKOUT, 0x00, CSAFE_PACKET_END};
-        uart_->write_array(cmd, sizeof(cmd));
+        send_command(CSAFE_CMD_STOP_WORKOUT, 0, nullptr);
     }
 
     void pause_workout() {
-        // CSAFE command to pause workout
-        uint8_t cmd[] = {CSAFE_PACKET_START, CSAFE_CMD_PAUSE_WORKOUT, 0x00, CSAFE_PACKET_END};
-        uart_->write_array(cmd, sizeof(cmd));
+        send_command(CSAFE_CMD_PAUSE_WORKOUT, 0, nullptr);
     }
 
     void resume_workout() {
-        // CSAFE command to resume workout
-        uint8_t cmd[] = {CSAFE_PACKET_START, CSAFE_CMD_RESUME_WORKOUT, 0x00, CSAFE_PACKET_END};
-        uart_->write_array(cmd, sizeof(cmd));
+        send_command(CSAFE_CMD_RESUME_WORKOUT, 0, nullptr);
     }
 
     void setup() override {
@@ -98,6 +83,20 @@ public:
 private:
     UARTComponent *uart_;
     std::vector<uint8_t> packet_buffer_;
+
+    void send_command(uint8_t cmd, uint8_t data_len, const uint8_t *data) {
+        // Build and send a CSAFE command packet
+        // Format: START | CMD | LEN | DATA... | END
+        uint8_t buf[6];
+        buf[0] = CSAFE_PACKET_START;
+        buf[1] = cmd;
+        buf[2] = data_len;
+        for (uint8_t i = 0; i < data_len; i++) {
+            buf[3 + i] = data[i];
+        }
+        buf[3 + data_len] = CSAFE_PACKET_END;
+        uart_->write_array(buf, 4 + data_len);
+    }
 
     void process_packet() {
         // Simple packet validation
