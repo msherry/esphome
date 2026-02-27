@@ -1,6 +1,7 @@
-#include "esphome.h"
+#ifndef TREADMILL_CSAFE_PARSER_H
+#define TREADMILL_CSAFE_PARSER_H
 
-using namespace esphome;
+#include "esphome.h"
 
 // CSAFE Protocol Constants
 #define CSAFE_CMD_GET_STATUS 0x80
@@ -21,7 +22,7 @@ using namespace esphome;
 
 class CSAFEParser : public Component {
 public:
-    CSAFEParser(UARTComponent *parent) : uart_(parent) {}
+    explicit CSAFEParser(UARTComponent *parent) : uart_(parent) {}
 
     void get_status() {
         send_command(CSAFE_CMD_GET_STATUS, 0, nullptr);
@@ -47,14 +48,16 @@ public:
         send_command(CSAFE_CMD_GET_GRADE, 0, nullptr);
     }
 
-    void setup() override {
+    void setup() {
         ESP_LOGD("csafe", "CSAFE Parser initialized");
     }
 
-    void loop() override {
+    void loop() {
         // Parse incoming data from UART
         while (uart_->available()) {
-            uint8_t byte = uart_->read();
+            uint8_t byte;
+            size_t len = uart_->read_array(&byte, 1);
+            if (len == 0) continue;
 
             if (byte == CSAFE_PACKET_START) {
                 // Start of packet - if we were in the middle of receiving a frame,
@@ -70,7 +73,6 @@ public:
                 // End of packet - validate and process
                 if (packet_state_ == PACKET_STATE_RECEIVING || packet_state_ == PACKET_STATE_STUFFED) {
                     packet_buffer_.push_back(byte);
-                    // Calculate expected checksum (last byte before END, after unstuffing)
                     if (validate_checksum()) {
                         process_packet();
                     } else {
@@ -87,7 +89,6 @@ public:
                 if (packet_state_ == PACKET_STATE_RECEIVING) {
                     packet_state_ = PACKET_STATE_STUFFED;
                 }
-                // If we're already stuffed or idle, this is stray data
             } else if (packet_state_ == PACKET_STATE_STUFFED) {
                 // This is a stuffed byte value - unstuff it
                 uint8_t original_byte;
@@ -134,7 +135,7 @@ private:
         } else if (byte == 0xF2) {
             uart_->write_array((uint8_t[]){CSAFE_PACKET_STUFF, 0x02}, 2);
         } else {
-            uart_->write(byte);
+            uart_->write_array(&byte, 1);
         }
     }
 
@@ -145,7 +146,8 @@ private:
         // Start and end markers are always sent as raw bytes
         uint8_t checksum = 0;
 
-        uart_->write(CSAFE_PACKET_START);
+        uint8_t start_byte = CSAFE_PACKET_START;
+        uart_->write_array(&start_byte, 1);
 
         // Send CMD and calculate checksum
         send_stuffed_byte(cmd);
@@ -164,7 +166,8 @@ private:
         // Send CHECKSUM
         send_stuffed_byte(checksum);
 
-        uart_->write(CSAFE_PACKET_END);
+        uint8_t end_byte = CSAFE_PACKET_END;
+        uart_->write_array(&end_byte, 1);
     }
 
     bool validate_checksum() {
@@ -173,15 +176,6 @@ private:
         // The stored checksum is the last byte before END.
         if (packet_buffer_.size() < 4) {
             return false; // Minimum: START + CMD + LEN + END (no data) is too short
-        }
-
-        // Extract expected checksum (last data byte before END)
-        uint8_t expected_checksum = packet_buffer_[packet_buffer_.size() - 2];
-
-        // Calculate actual checksum (XOR of all bytes between START and END, excluding checksum byte)
-        uint8_t calculated_checksum = 0;
-        for (size_t i = 1; i < packet_buffer_.size() - 2; i++) {
-            calculated_checksum ^= packet_buffer_[i];
         }
 
         // The spec says: "checksum is computed with byte-by-byte XORing of the frame contents
@@ -251,3 +245,5 @@ private:
         }
     }
 };
+
+#endif  // TREADMILL_CSAFE_PARSER_H

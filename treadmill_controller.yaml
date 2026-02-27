@@ -1,7 +1,12 @@
 esphome:
   includes:
     - treadmill_controller.h
-    - treadmill_csafe_parser.cpp
+    - treadmill_csafe_parser.h
+  on_boot:
+    then:
+      - lambda: |-
+          auto csafe = new CSAFEParser(id(treadmill_bus));
+          App.register_component(csafe);
 
 esp32:
   board: esp32dev
@@ -154,8 +159,6 @@ interval:
 
           ESP_LOGD("pid", "Setting speed to %.1f mph", speed);
           id(set_treadmill_speed).execute(speed);
-
-# CSAFE Parser Component
 
 script:
   - id: set_treadmill_speed
