@@ -123,16 +123,12 @@ interval:
   - interval: 5s
     then:
       - lambda: |-
-          if (CSAFE_GET_INSTANCE() != nullptr) {
-            CSAFE_GET_INSTANCE()->get_speed();
-          }
+          CSAFE_GET_INSTANCE()->get_speed();
       - delay: 1s  # Wait for response
       - lambda: |-
-          if (CSAFE_GET_INSTANCE() != nullptr) {
-            float polled_speed = CSAFE_GET_INSTANCE()->get_last_speed();
-            id(treadmill_speed) = polled_speed;
-            ESP_LOGD("csafe", "Polled speed: %.2f mph", polled_speed);
-          }
+          float polled_speed = CSAFE_GET_INSTANCE()->get_last_speed();
+          id(treadmill_speed) = polled_speed;
+          ESP_LOGD("csafe", "Polled speed: %.2f mph", polled_speed);
 
   - interval: 15s
     then:
@@ -188,6 +184,4 @@ script:
           if (speed < 3.0) speed = 3.0;
 
           // Send CSAFE command to set the speed
-          if (CSAFE_GET_INSTANCE() != nullptr) {
-            CSAFE_GET_INSTANCE()->set_speed(speed);
-          }
+          CSAFE_GET_INSTANCE()->set_speed(speed);

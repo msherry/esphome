@@ -20,6 +20,10 @@
 #define PACKET_STATE_RECEIVING 1   // Receiving packet data
 #define PACKET_STATE_STUFFED 2     // Just received stuffing byte
 
+// Units for commands
+#define CSAFE_UNIT_MPH 0x10
+#define CSAFE_UNIT_PCT_GRADE 0x4A
+
 class CSAFEParser : public Component {
 public:
     explicit CSAFEParser(UARTComponent *parent) : uart_(parent) {}
@@ -33,13 +37,13 @@ public:
 
     void set_speed(float speed_mph) {
         uint16_t speed_raw = (uint16_t)(speed_mph * 100);
-        uint8_t data[] = {(uint8_t)(speed_raw & 0xFF), (uint8_t)(speed_raw >> 8), 0x10};
+        uint8_t data[] = {(uint8_t)(speed_raw & 0xFF), (uint8_t)(speed_raw >> 8), CSAFE_UNIT_MPH};
         send_command(CSAFE_CMD_SET_SPEED, 3, data);
     }
 
     void set_incline(float incline_percent) {
         uint16_t incline_raw = (uint16_t)(incline_percent * 100);
-        uint8_t data[] = {(uint8_t)(incline_raw & 0xFF), (uint8_t)(incline_raw >> 8), 0x6A};
+        uint8_t data[] = {(uint8_t)(incline_raw & 0xFF), (uint8_t)(incline_raw >> 8), CSAFE_UNIT_PCT_GRADE};
         send_command(CSAFE_CMD_SET_GRADE, 3, data);
     }
 
@@ -52,6 +56,8 @@ public:
     void get_incline() {
         send_command(CSAFE_CMD_GET_GRADE, 0, nullptr);
     }
+
+    float get_last_incline() const { return last_incline_; }
 
     void setup() {
         ESP_LOGD("csafe", "CSAFE Parser initialized");
@@ -236,6 +242,7 @@ private:
             if (length >= 3) {
                 uint16_t grade_raw = packet_buffer_[4] | (packet_buffer_[5] << 8);
                 float grade = grade_raw / 100.0f;
+                last_incline_ = grade;
                 ESP_LOGD("csafe", "Received grade/incline: %.2f%%", grade);
             }
             break;
@@ -254,6 +261,7 @@ private:
     static CSAFEParser *instance_;
 
     float last_speed_ = 0.0;  // Last parsed speed from treadmill
+    float last_incline_ = 0.0;  // Last parsed grade from treadmill
 };
 
 CSAFEParser *CSAFEParser::instance_ = nullptr;
