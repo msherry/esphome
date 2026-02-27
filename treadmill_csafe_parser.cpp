@@ -3,56 +3,43 @@
 using namespace esphome;
 
 // CSAFE Protocol Constants
-#define CSAFE_CMD_SET_SPEED 0x01
-#define CSAFE_CMD_SET_INCLINE 0x02
-#define CSAFE_CMD_SET_TARGET_HEART_RATE 0x03
-#define CSAFE_CMD_GET_SPEED 0x04
-#define CSAFE_CMD_GET_INCLINE 0x05
-#define CSAFE_CMD_GET_HEART_RATE 0x06
-#define CSAFE_CMD_START_WORKOUT 0x07
-#define CSAFE_CMD_STOP_WORKOUT 0x08
-#define CSAFE_CMD_PAUSE_WORKOUT 0x09
-#define CSAFE_CMD_RESUME_WORKOUT 0x0A
+#define CSAFE_CMD_GET_STATUS 0x80
+#define CSAFE_CMD_SET_SPEED 0x25
+#define CSAFE_CMD_SET_GRADE 0x28
+#define CSAFE_CMD_GET_SPEED 0x53
+#define CSAFE_CMD_GET_GRADE 0x58
 
 // CSAFE Packet Structure
-#define CSAFE_PACKET_START 0x55
-#define CSAFE_PACKET_END 0x56
+#define CSAFE_PACKET_START 0xF1
+#define CSAFE_PACKET_END 0xF2
+#define CSAFE_PACKET_STUFF 0xF3
 
 class CSAFEParser : public Component {
 public:
     CSAFEParser(UARTComponent *parent) : uart_(parent) {}
 
+    void get_status() {
+        send_command(CSAFE_CMD_GET_STATUS, 0, nullptr);
+    }
+
     void set_speed(float speed_mph) {
         uint16_t speed_raw = (uint16_t)(speed_mph * 100);
-        uint8_t data[] = {(uint8_t)(speed_raw & 0xFF), (uint8_t)(speed_raw >> 8)};
-        send_command(CSAFE_CMD_SET_SPEED, 2, data);
+        uint8_t data[] = {(uint8_t)(speed_raw & 0xFF), (uint8_t)(speed_raw >> 8), 0x10};
+        send_command(CSAFE_CMD_SET_SPEED, 3, data);
     }
 
     void set_incline(float incline_percent) {
         uint16_t incline_raw = (uint16_t)(incline_percent * 100);
-        uint8_t data[] = {(uint8_t)(incline_raw & 0xFF), (uint8_t)(incline_raw >> 8)};
-        send_command(CSAFE_CMD_SET_INCLINE, 2, data);
+        uint8_t data[] = {(uint8_t)(incline_raw & 0xFF), (uint8_t)(incline_raw >> 8), 0x6A};
+        send_command(CSAFE_CMD_SET_GRADE, 3, data);
     }
 
-    void set_target_heart_rate(uint16_t target_hr) {
-        uint8_t data[] = {(uint8_t)(target_hr & 0xFF), (uint8_t)(target_hr >> 8)};
-        send_command(CSAFE_CMD_SET_TARGET_HEART_RATE, 2, data);
+    void get_speed() {
+        send_command(CSAFE_CMD_GET_SPEED, 0, nullptr);
     }
 
-    void start_workout() {
-        send_command(CSAFE_CMD_START_WORKOUT, 0, nullptr);
-    }
-
-    void stop_workout() {
-        send_command(CSAFE_CMD_STOP_WORKOUT, 0, nullptr);
-    }
-
-    void pause_workout() {
-        send_command(CSAFE_CMD_PAUSE_WORKOUT, 0, nullptr);
-    }
-
-    void resume_workout() {
-        send_command(CSAFE_CMD_RESUME_WORKOUT, 0, nullptr);
+    void get_incline() {
+        send_command(CSAFE_CMD_GET_GRADE, 0, nullptr);
     }
 
     void setup() override {
@@ -69,10 +56,30 @@ public:
                 // Start of packet - reset buffer
                 packet_buffer_.clear();
                 packet_buffer_.push_back(byte);
+                unstuff_state_ = 0;  // Reset unstuff state
             } else if (byte == CSAFE_PACKET_END) {
                 // End of packet - process complete packet
                 packet_buffer_.push_back(byte);
                 process_packet();
+            } else if (byte == CSAFE_PACKET_STUFF) {
+                // Next byte is a stuffed byte
+                unstuff_state_ = 1;
+            } else if (unstuff_state_ == 1) {
+                // This is a stuffed byte value - unstuff it
+                uint8_t original_byte;
+                if (byte == 0x00) {
+                    original_byte = 0xF0;
+                } else if (byte == 0x01) {
+                    original_byte = CSAFE_PACKET_START;
+                } else if (byte == 0x02) {
+                    original_byte = CSAFE_PACKET_END;
+                } else if (byte == 0x03) {
+                    original_byte = CSAFE_PACKET_STUFF;
+                } else {
+                    original_byte = byte;  // Shouldn't happen
+                }
+                packet_buffer_.push_back(original_byte);
+                unstuff_state_ = 0;
             } else {
                 // Data byte
                 packet_buffer_.push_back(byte);
@@ -83,19 +90,51 @@ public:
 private:
     UARTComponent *uart_;
     std::vector<uint8_t> packet_buffer_;
+    uint8_t unstuff_state_ = 0;  // 0 = normal, 1 = expecting stuffed byte
+
+    void send_stuffed_byte(uint8_t byte) {
+        // Send a byte with byte-stuffing if needed
+        // Only 0xF0-0xF3 need to be stuffed
+        if (byte == CSAFE_PACKET_STUFF) {
+            uart_->write_array((uint8_t[]){CSAFE_PACKET_STUFF, 0x03}, 2);
+        } else if (byte == 0xF0) {
+            uart_->write_array((uint8_t[]){CSAFE_PACKET_STUFF, 0x00}, 2);
+        } else if (byte == 0xF1) {
+            uart_->write_array((uint8_t[]){CSAFE_PACKET_STUFF, 0x01}, 2);
+        } else if (byte == 0xF2) {
+            uart_->write_array((uint8_t[]){CSAFE_PACKET_STUFF, 0x02}, 2);
+        } else {
+            uart_->write(byte);
+        }
+    }
 
     void send_command(uint8_t cmd, uint8_t data_len, const uint8_t *data) {
-        // Build and send a CSAFE command packet
-        // Format: START | CMD | LEN | DATA... | END
-        uint8_t buf[6];
-        buf[0] = CSAFE_PACKET_START;
-        buf[1] = cmd;
-        buf[2] = data_len;
+        // Build and send a CSAFE command packet with byte-stuffing
+        // Format: START | CMD | LEN | DATA... | CHECKSUM | END
+        // Only the command, length, data, and checksum bytes are stuffed
+        // Start and end markers are always sent as raw bytes
+        uint8_t checksum = 0;
+
+        uart_->write(CSAFE_PACKET_START);
+
+        // Send CMD and calculate checksum
+        send_stuffed_byte(cmd);
+        checksum ^= cmd;
+
+        // Send LEN and calculate checksum
+        send_stuffed_byte(data_len);
+        checksum ^= data_len;
+
+        // Send DATA and calculate checksum
         for (uint8_t i = 0; i < data_len; i++) {
-            buf[3 + i] = data[i];
+            send_stuffed_byte(data[i]);
+            checksum ^= data[i];
         }
-        buf[3 + data_len] = CSAFE_PACKET_END;
-        uart_->write_array(buf, 4 + data_len);
+
+        // Send CHECKSUM
+        send_stuffed_byte(checksum);
+
+        uart_->write(CSAFE_PACKET_END);
     }
 
     void process_packet() {
@@ -121,27 +160,26 @@ private:
 
         switch (command) {
         case CSAFE_CMD_GET_SPEED:
-            // Handle speed response
-            if (length >= 2) {
-                float speed = (packet_buffer_[4] | (packet_buffer_[5] << 8)) / 100.0f;
+            // Handle speed response (3 data bytes: LSB, MSB, unit)
+            if (length >= 3) {
+                uint16_t speed_raw = packet_buffer_[4] | (packet_buffer_[5] << 8);
+                float speed = speed_raw / 100.0f;
                 ESP_LOGD("csafe", "Received speed: %.2f mph", speed);
             }
             break;
 
-        case CSAFE_CMD_GET_INCLINE:
-            // Handle incline response
-            if (length >= 2) {
-                float incline = (packet_buffer_[4] | (packet_buffer_[5] << 8)) / 100.0f;
-                ESP_LOGD("csafe", "Received incline: %.2f%%", incline);
+        case CSAFE_CMD_GET_GRADE:
+            // Handle grade/incline response (3 data bytes: LSB, MSB, unit)
+            if (length >= 3) {
+                uint16_t grade_raw = packet_buffer_[4] | (packet_buffer_[5] << 8);
+                float grade = grade_raw / 100.0f;
+                ESP_LOGD("csafe", "Received grade/incline: %.2f%%", grade);
             }
             break;
 
-        case CSAFE_CMD_GET_HEART_RATE:
-            // Handle heart rate response
-            if (length >= 1) {
-                uint16_t hr = packet_buffer_[4];
-                ESP_LOGD("csafe", "Received heart rate: %d BPM", hr);
-            }
+        case CSAFE_CMD_GET_STATUS:
+            // Handle status response
+            ESP_LOGD("csafe", "Received status response, length: %d", length);
             break;
 
         default:
