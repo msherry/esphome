@@ -47,6 +47,8 @@ public:
         send_command(CSAFE_CMD_GET_SPEED, 0, nullptr);
     }
 
+    float get_last_speed() const { return last_speed_; }
+
     void get_incline() {
         send_command(CSAFE_CMD_GET_GRADE, 0, nullptr);
     }
@@ -224,6 +226,7 @@ private:
             if (length >= 3) {
                 uint16_t speed_raw = packet_buffer_[4] | (packet_buffer_[5] << 8);
                 float speed = speed_raw / 100.0f;
+                last_speed_ = speed;
                 ESP_LOGD("csafe", "Received speed: %.2f mph", speed);
             }
             break;
@@ -249,6 +252,8 @@ private:
     }
 
     static CSAFEParser *instance_;
+
+    float last_speed_ = 0.0;  // Last parsed speed from treadmill
 };
 
 CSAFEParser *CSAFEParser::instance_ = nullptr;

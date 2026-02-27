@@ -118,7 +118,22 @@ sensor:
         return NAN;
 
 
+# Poll treadmill speed every 5 seconds to stay in sync
 interval:
+  - interval: 5s
+    then:
+      - lambda: |-
+          if (CSAFE_GET_INSTANCE() != nullptr) {
+            CSAFE_GET_INSTANCE()->get_speed();
+          }
+      - delay: 1s  # Wait for response
+      - lambda: |-
+          if (CSAFE_GET_INSTANCE() != nullptr) {
+            float polled_speed = CSAFE_GET_INSTANCE()->get_last_speed();
+            id(treadmill_speed) = polled_speed;
+            ESP_LOGD("csafe", "Polled speed: %.2f mph", polled_speed);
+          }
+
   - interval: 15s
     then:
       - lambda: |-
