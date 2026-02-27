@@ -22,7 +22,9 @@
 
 // Units for commands
 #define CSAFE_UNIT_MPH 0x10
+#define CSAFE_UNIT_POINT_01_MPH 0x11
 #define CSAFE_UNIT_PCT_GRADE 0x4A
+#define CSAFE_UNIT_POINT_01_PCT_GRADE 0x4C
 
 class CSAFEParser : public Component {
 public:
