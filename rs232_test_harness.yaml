@@ -4,8 +4,10 @@ esphome:
   includes:
     - rs232_test_harness.h
   on_boot:
+    priority: -10 # Run after UART is ready
     then:
       - lambda: |-
+          // Pass the uart_bus ID here - this is the standard way
           auto *harness = new esphome::rs232::RS232TestHarness(id(uart_bus));
           App.register_component(harness);
           harness->set_response_sensor(id(rs232_response));
@@ -30,8 +32,15 @@ logger:
 uart:
   id: uart_bus
   tx_pin: GPIO17
-  rx_pin: GPIO16
+  rx_pin:
+    number: GPIO16
+    inverted: false
+
   baud_rate: 38400
+  rx_buffer_size: 512  # Increased for safety
+  debug:
+    direction: BOTH
+    dummy_receiver: true
 
 # Global variable to store command buffer
 globals:
@@ -42,36 +51,12 @@ globals:
 
 # Scripts to send arbitrary bytes via UART
 script:
-  # Send a single byte (0-255)
-  - id: send_rs232_byte
-    parameters:
-      byte_val: int
-    then:
-      - lambda: |-
-          auto* harness = esphome::rs232::RS232TestHarness::get_instance();
-          std::vector<uint8_t> data = {(uint8_t)byte_val};
-          harness->send_command(data);
-
   # Send bytes from the global buffer and clear it
   - id: send_rs232_command
     then:
       - lambda: |-
           auto* harness = esphome::rs232::RS232TestHarness::get_instance();
           harness->send_command(id(command_buffer));
-          id(command_buffer).clear();
-
-  # Add a byte to the command buffer
-  - id: add_byte_to_buffer
-    parameters:
-      byte_val: int
-    then:
-      - lambda: |-
-          id(command_buffer).push_back((uint8_t)byte_val);
-
-  # Clear the command buffer without sending
-  - id: clear_command_buffer
-    then:
-      - lambda: |-
           id(command_buffer).clear();
 
 # Text sensor to display received data
@@ -82,11 +67,17 @@ text_sensor:
     icon: 'mdi:serial'
     update_interval: 1s
 
+# Text input component for hex string entry
+text:
   - platform: template
-    name: "Hex Command Input"
-    id: hex_command_input
-    icon: 'mdi:code-tags'
-    update_interval: 1s
+    name: "Hex Input Box"
+    id: hex_input_box
+    icon: "mdi:keyboard"
+    mode: text
+    optimistic: true
+    min_length: 0
+    max_length: 128
+    initial_value: ""
 
 # Binary sensor to indicate data availability
 binary_sensor:
@@ -95,6 +86,14 @@ binary_sensor:
     id: rs232_data_available
     icon: 'mdi:signal'
     device_class: connectivity
+    filters:
+      - delayed_off: 5s  # Keeps the light on for 5 seconds after data stops
+
+  # - platform: gpio
+  #   pin:
+  #     number: GPIO16
+  #     mode: INPUT_PULLDOWN
+  #   name: "RX Pin Physical Test"
 
 # Button to clear the response display
 button:
@@ -106,70 +105,30 @@ button:
           id: rs232_response
           state: ""
 
-  # Button to send the current command buffer
+  # Button to send hex string directly
   - platform: template
-    name: "Send Command"
-    icon: 'mdi:send'
-    on_press:
-      - script.execute:
-          id: send_rs232_command
-
-  # Button to clear the command buffer
-  - platform: template
-    name: "Clear Buffer"
-    icon: 'mdi:cancel'
-    on_press:
-      - script.execute:
-          id: clear_command_buffer
-
-  # Button to parse the hex input and add to buffer
-  - platform: template
-    name: "Parse Hex Input"
-    icon: 'mdi:hexagon'
+    name: "Send Hex String"
     on_press:
       - lambda: |-
-          std::string hex = id(hex_command_input).state;
-          // Only remove spaces - keep 0x prefixes if present
-          hex.erase(std::remove(hex.begin(), hex.end(), ' '), hex.end());
-
-          // Process pairs of hex digits
-          if (hex.length() % 2 != 0) {
-            ESP_LOGE("rs232", "Hex string must have even number of digits");
+          auto* harness = esphome::rs232::RS232TestHarness::get_instance();
+          if (harness == nullptr) {
+            ESP_LOGE("rs232", "Harness not ready yet!");
             return;
           }
 
+          std::string hex = id(hex_input_box).state;
+          hex.erase(std::remove(hex.begin(), hex.end(), ' '), hex.end());
+
+          if (hex.length() % 2 != 0) return;
+
+          std::vector<uint8_t> data;
           for (size_t i = 0; i < hex.length(); i += 2) {
-            std::string byte_str = hex.substr(i, 2);
-            uint8_t byte = (uint8_t) strtol(byte_str.c_str(), nullptr, 16);
-            id(command_buffer).push_back(byte);
-            ESP_LOGD("rs232", "Added byte: 0x%02X", byte);
+            data.push_back((uint8_t) strtol(hex.substr(i, 2).c_str(), nullptr, 16));
           }
+          harness->send_command(data);
 
-# Number inputs for entering hex bytes
-number:
-  # Hex byte input (0-255)
   - platform: template
-    name: "Add Byte (0-255)"
-    id: add_byte_input
-    icon: 'mdi:numeric'
-    min_value: 0
-    max_value: 255
-    step: 1
-    mode: box
-    update_interval: never
-    unit_of_measurement: "hex"
-    set_action:
+    name: "Software Pulse"
+    on_press:
       - lambda: |-
-          id(add_byte_to_buffer).execute(x);
-
-# Sensors (read-only)
-sensor:
-  # Sensor to display buffer size (read-only)
-  - platform: template
-    name: "Buffer Size"
-    id: buffer_size_display
-    icon: 'mdi:buffer'
-    unit_of_measurement: "bytes"
-    update_interval: 1s
-    lambda: |-
-      return id(command_buffer).size();
+          id(uart_bus).write_str("HELLO\n");
