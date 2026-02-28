@@ -7,11 +7,14 @@ esphome:
     priority: -10 # Run after UART is ready
     then:
       - lambda: |-
-          // Pass the uart_bus ID here - this is the standard way
-          auto *harness = new esphome::rs232::RS232TestHarness(id(uart_bus));
-          App.register_component(harness);
+          // Create harness
+          auto *harness = new esphome::rs232::RS232TestHarness();
+          // Set UART FIRST - before setup()
+          harness->set_uart(id(uart_bus));
           harness->set_response_sensor(id(rs232_response));
           harness->set_data_available_sensor(id(rs232_data_available));
+          // Manually call setup() - no registration needed
+          harness->setup();
 
 esp32:
   board: esp32dev
@@ -38,9 +41,9 @@ uart:
 
   baud_rate: 38400
   rx_buffer_size: 512  # Increased for safety
-  debug:
-    direction: BOTH
-    dummy_receiver: true
+  # debug:
+  #   direction: BOTH
+  #   dummy_receiver: true
 
 # Global variable to store command buffer
 globals:
@@ -88,6 +91,16 @@ binary_sensor:
     device_class: connectivity
     filters:
       - delayed_off: 5s  # Keeps the light on for 5 seconds after data stops
+
+# Interval to call harness loop
+interval:
+  - interval: 10ms
+    then:
+      - lambda: |-
+          auto* harness = esphome::rs232::RS232TestHarness::get_instance();
+          if (harness != nullptr) {
+            harness->loop();
+          }
 
   # - platform: gpio
   #   pin:

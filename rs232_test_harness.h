@@ -7,69 +7,65 @@
 namespace esphome {
 namespace rs232 {
 
-class RS232TestHarness : public Component {
+// Forward declaration
+class RS232TestHarness;
+
+// Global instance pointer - declared extern here, defined after class
+extern RS232TestHarness *rs232_harness_instance;
+
+class RS232TestHarness {
  public:
-  // FIX: Pass the UART component in the constructor
-  explicit RS232TestHarness(UARTComponent *parent) : uart_(parent) {
-    instance_ = this; // FIX: Set the instance here so it's never null
+  RS232TestHarness() {}
+
+  void setup() {
+    ESP_LOGD("rs232", "RS232 Test Harness setup");
+    if (uart_ == nullptr) {
+      ESP_LOGE("rs232", "UART component is NULL!");
+    }
+    rs232_harness_instance = this;
   }
 
-  void setup() override {
-    ESP_LOGD("rs232", "RS232 Test Harness initialized");
+  void loop() {
+      static uint32_t last_debug = 0;
+      uint32_t now = millis();
+      if (uart_ == nullptr) {
+          ESP_LOGE("rs232", "UART component is NULL in loop()!");
+          return;
+      }
+
+      // Periodic debug to show component is running
+      if (now - last_debug > 1000) {
+          ESP_LOGD("rs232_debug", "Component loop running, rx_buffer_ size: %zu", rx_buffer_.size());
+          last_debug = now;
+      }
+
+    // Check if UART has data available
+    int available = uart_->available();
+    if (available > 0) {
+        ESP_LOGD("rs232_debug", "UART reports %d bytes available", available);
+
+        // Read all available bytes
+        while (uart_->available()) {
+          uint8_t byte;
+          int read_count = uart_->read_array(&byte, 1);
+          if (read_count > 0) {
+              ESP_LOGI("rs232_raw", "RAW BYTE RECEIVED: 0x%02X ('%c')", byte,
+                      (byte >= 32 && byte <= 126) ? byte : '.');
+            rx_buffer_.push_back(byte);
+            last_rx_time_ = now;
+          } else {
+            ESP_LOGW("rs232_debug", "read_array returned 0, breaking");
+            break;
+          }
+        }
+    }
+
+    if (!rx_buffer_.empty() && (now - last_rx_time_ > 50)) {
+      ESP_LOGD("rs232_debug", "Publishing response with %zu bytes", rx_buffer_.size());
+      publish_response();
+    }
   }
 
-  // void loop() override {
-  //   uint32_t now = millis();
-  //   if (uart_ == nullptr) return;
-
-  //   // Temporary: Log whenever the UART thinks it sees data
-  //   if (uart_->available() > 0) {
-  //       ESP_LOGD("rs232_debug", "UART reports %d bytes available", uart_->available());
-  //   }
-
-  //   while (uart_->available()) {
-  //     uint8_t byte;
-  //     if (uart_->read_array(&byte, 1) > 0) {
-  //       rx_buffer_.push_back(byte);
-  //       last_rx_time_ = now;
-  //     }
-  //   }
-
-  //   if (!rx_buffer_.empty() && (now - last_rx_time_ > 50)) {
-  //     publish_response();
-  //   }
-  // }
-
-    void loop() override {
-  uint32_t now = millis();
-  if (uart_ == nullptr) return;
-
-  // 1. Raw ESP-IDF check: Does the driver think there's data?
-  size_t buffered_len = 0;
-  uart_get_buffered_data_len(UART_NUM_1, &buffered_len);
-  if (buffered_len > 0) {
-    ESP_LOGD("rs232_raw", "IDF driver reports %zu bytes waiting", buffered_len);
-  }
-
-  // 2. Immediate Read: No buffers, no timers
-  uint8_t dummy_byte;
-  // We use the underlying IDF call to see if it bypasses the "deafness"
-  int rx_len = uart_read_bytes(UART_NUM_1, &dummy_byte, 1, 0);
-
-  if (rx_len > 0) {
-    ESP_LOGI("rs232_raw", "RAW BYTE RECEIVED: 0x%02X ('%c')", dummy_byte,
-             (dummy_byte >= 32 && dummy_byte <= 126) ? dummy_byte : '.');
-
-    // Still feed the buffer for your UI
-    rx_buffer_.push_back(dummy_byte);
-    last_rx_time_ = now;
-  }
-
-  // 3. Original publishing logic (keep this)
-  if (!rx_buffer_.empty() && (now - last_rx_time_ > 50)) {
-    publish_response();
-  }
-}
 
   void send_command(const std::vector<uint8_t>& bytes) {
       if (bytes.empty()) {
@@ -77,17 +73,25 @@ class RS232TestHarness : public Component {
           return;
       }
 
-    if (uart_ == nullptr) return;
+    if (uart_ == nullptr) {
+      ESP_LOGE("rs232", "UART is null, cannot send!");
+      return;
+    }
 
     ESP_LOGD("rs232", "Sending %zu bytes", bytes.size());
+    for (uint8_t byte : bytes) {
+      ESP_LOGD("rs232", "  -> 0x%02X", byte);
+    }
     uart_->write_array(bytes);
     uart_->flush(); // Ensure data is actually sent
+    ESP_LOGD("rs232", "Send complete");
   }
 
+  void set_uart(UARTComponent *uart) { uart_ = uart; }
   void set_response_sensor(text_sensor::TextSensor* sensor) { rs232_response_ = sensor; }
   void set_data_available_sensor(binary_sensor::BinarySensor* sensor) { rs232_data_available_ = sensor; }
 
-  static RS232TestHarness *get_instance() { return instance_; }
+  static RS232TestHarness *get_instance() { return rs232_harness_instance; }
 
  private:
   UARTComponent *uart_;
@@ -95,7 +99,6 @@ class RS232TestHarness : public Component {
   binary_sensor::BinarySensor* rs232_data_available_{nullptr};
   std::vector<uint8_t> rx_buffer_;
   uint32_t last_rx_time_{0};
-  static RS232TestHarness *instance_;
 
   void publish_response() {
     std::string hex_str;
@@ -110,7 +113,8 @@ class RS232TestHarness : public Component {
   }
 };
 
-RS232TestHarness *RS232TestHarness::instance_ = nullptr;
+// Define the global pointer after class definition
+RS232TestHarness *rs232_harness_instance = nullptr;
 
 }  // namespace rs232
 }  // namespace esphome
