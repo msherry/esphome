@@ -1,0 +1,175 @@
+esphome:
+  name: rs232-test-harness
+  friendly_name: RS232 Test Harness
+  includes:
+    - rs232_test_harness.h
+  on_boot:
+    then:
+      - lambda: |-
+          auto *harness = new esphome::rs232::RS232TestHarness(id(uart_bus));
+          App.register_component(harness);
+          harness->set_response_sensor(id(rs232_response));
+          harness->set_data_available_sensor(id(rs232_data_available));
+
+esp32:
+  board: esp32dev
+  variant: esp32
+  cpu_frequency: 240MHZ
+  framework:
+    type: esp-idf
+    advanced:
+      minimum_chip_revision: "3.1"
+
+packages:
+  device_base: !include _common.yaml
+
+logger:
+  level: DEBUG
+
+# UART configuration matching treadmill_controller.yaml
+uart:
+  id: uart_bus
+  tx_pin: GPIO17
+  rx_pin: GPIO16
+  baud_rate: 38400
+
+# Global variable to store command buffer
+globals:
+  - id: command_buffer
+    type: std::vector<uint8_t>
+    restore_value: no
+    initial_value: "std::vector<uint8_t>()"
+
+# Scripts to send arbitrary bytes via UART
+script:
+  # Send a single byte (0-255)
+  - id: send_rs232_byte
+    parameters:
+      byte_val: int
+    then:
+      - lambda: |-
+          auto* harness = esphome::rs232::RS232TestHarness::get_instance();
+          std::vector<uint8_t> data = {(uint8_t)byte_val};
+          harness->send_command(data);
+
+  # Send bytes from the global buffer and clear it
+  - id: send_rs232_command
+    then:
+      - lambda: |-
+          auto* harness = esphome::rs232::RS232TestHarness::get_instance();
+          harness->send_command(id(command_buffer));
+          id(command_buffer).clear();
+
+  # Add a byte to the command buffer
+  - id: add_byte_to_buffer
+    parameters:
+      byte_val: int
+    then:
+      - lambda: |-
+          id(command_buffer).push_back((uint8_t)byte_val);
+
+  # Clear the command buffer without sending
+  - id: clear_command_buffer
+    then:
+      - lambda: |-
+          id(command_buffer).clear();
+
+# Text sensor to display received data
+text_sensor:
+  - platform: template
+    name: "Last RS232 Response"
+    id: rs232_response
+    icon: 'mdi:serial'
+    update_interval: 1s
+
+  - platform: template
+    name: "Hex Command Input"
+    id: hex_command_input
+    icon: 'mdi:code-tags'
+    update_interval: 1s
+
+# Binary sensor to indicate data availability
+binary_sensor:
+  - platform: template
+    name: "RS232 Data Available"
+    id: rs232_data_available
+    icon: 'mdi:signal'
+    device_class: connectivity
+
+# Button to clear the response display
+button:
+  - platform: template
+    name: "Clear Response"
+    icon: 'mdi:eraser'
+    on_press:
+      - text_sensor.template.publish:
+          id: rs232_response
+          state: ""
+
+  # Button to send the current command buffer
+  - platform: template
+    name: "Send Command"
+    icon: 'mdi:send'
+    on_press:
+      - script.execute:
+          id: send_rs232_command
+
+  # Button to clear the command buffer
+  - platform: template
+    name: "Clear Buffer"
+    icon: 'mdi:cancel'
+    on_press:
+      - script.execute:
+          id: clear_command_buffer
+
+  # Button to parse the hex input and add to buffer
+  - platform: template
+    name: "Parse Hex Input"
+    icon: 'mdi:hexagon'
+    on_press:
+      - lambda: |-
+          std::string hex = id(hex_command_input).state;
+          // Only remove spaces - keep 0x prefixes if present
+          hex.erase(std::remove(hex.begin(), hex.end(), ' '), hex.end());
+
+          // Process pairs of hex digits
+          if (hex.length() % 2 != 0) {
+            ESP_LOGE("rs232", "Hex string must have even number of digits");
+            return;
+          }
+
+          for (size_t i = 0; i < hex.length(); i += 2) {
+            std::string byte_str = hex.substr(i, 2);
+            uint8_t byte = (uint8_t) strtol(byte_str.c_str(), nullptr, 16);
+            id(command_buffer).push_back(byte);
+            ESP_LOGD("rs232", "Added byte: 0x%02X", byte);
+          }
+
+# Number inputs for entering hex bytes
+number:
+  # Hex byte input (0-255)
+  - platform: template
+    name: "Add Byte (0-255)"
+    id: add_byte_input
+    icon: 'mdi:numeric'
+    min_value: 0
+    max_value: 255
+    step: 1
+    mode: box
+    update_interval: never
+    unit_of_measurement: "hex"
+    set_action:
+      - lambda: |-
+          id(add_byte_to_buffer).execute(x);
+
+# Sensors (read-only)
+sensor:
+  # Sensor to display buffer size (read-only)
+  - platform: template
+    name: "Buffer Size"
+    id: buffer_size_display
+    icon: 'mdi:buffer'
+    unit_of_measurement: "bytes"
+    update_interval: 1s
+    lambda: |-
+      return id(command_buffer).size();
