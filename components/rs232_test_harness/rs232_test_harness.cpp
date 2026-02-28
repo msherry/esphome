@@ -120,6 +120,11 @@ void RS232TestHarness::publish_console_() {
     combined += "\n";
   }
 
+  // Truncate to MAX_RESPONSE_CHARS, keeping only the trailing bytes
+  if (combined.length() > MAX_RESPONSE_CHARS) {
+    combined = combined.substr(combined.length() - MAX_RESPONSE_CHARS);
+  }
+
   console_sensor_->publish_state(combined);
 }
 

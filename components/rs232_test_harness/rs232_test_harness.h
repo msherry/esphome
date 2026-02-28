@@ -40,6 +40,7 @@ class RS232TestHarness : public Component, public uart::UARTDevice {
   // Limits
   static const size_t MAX_PACKET_BYTES = 128;
   static const size_t MAX_LINES = 20;
+  static const size_t MAX_RESPONSE_CHARS = 176;
   static const uint32_t RX_TIMEOUT_MS = 20;
   static const uint32_t PUBLISH_INTERVAL_MS = 100;
 
