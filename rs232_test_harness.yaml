@@ -20,6 +20,8 @@ packages:
 
 logger:
   level: DEBUG
+  logs:
+    text_sensor: INFO
 
 # UART configuration matching treadmill_controller.yaml
 uart:
@@ -58,7 +60,7 @@ binary_sensor:
 rs232_test_harness:
   id: harness
   uart_id: uart_bus
-  response_sensor: rs232_response
+  console_sensor: rs232_response
   data_available_sensor: rs232_data_available
 
 button:
