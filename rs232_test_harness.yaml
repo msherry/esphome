@@ -63,6 +63,14 @@ rs232_test_harness:
   console_sensor: rs232_response
   data_available_sensor: rs232_data_available
 
+pid_controller:
+  id: my_pid
+  kp: 0.05
+  ki: 0.01
+  kd: 0.02
+  output_min: 2.0
+  output_max: 10.0
+
 button:
   - platform: template
     name: Send HELLO
