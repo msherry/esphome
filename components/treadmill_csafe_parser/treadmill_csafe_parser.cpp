@@ -78,14 +78,18 @@ void TreadmillCSAFEParser::loop() {
 }
 
 void TreadmillCSAFEParser::set_speed(float speed_mph) {
-  uint16_t speed_raw = (uint16_t)(speed_mph * 100);
-  uint8_t data[] = {(uint8_t)(speed_raw & 0xFF), (uint8_t)(speed_raw >> 8), CSAFE_UNIT_MPH};
+  // CSAFE speed uses 1/10th mph units (0.1 mph resolution)
+  // The unit byte CSAFE_UNIT_TENTH_MPH (0x11) tells the device to scale by 0.1
+  uint16_t speed_raw = (uint16_t)(speed_mph * 10);
+  uint8_t data[] = {(uint8_t)(speed_raw & 0xFF), (uint8_t)(speed_raw >> 8), CSAFE_UNIT_TENTH_MPH};
   send_command(CSAFE_CMD_SET_SPEED, 3, data);
 }
 
 void TreadmillCSAFEParser::set_incline(float incline_percent) {
-  uint16_t incline_raw = (uint16_t)(incline_percent * 100);
-  uint8_t data[] = {(uint8_t)(incline_raw & 0xFF), (uint8_t)(incline_raw >> 8), CSAFE_UNIT_PCT_GRADE};
+  // CSAFE grade uses 0.1% grade units
+  // The unit byte CSAFE_UNIT_TENTH_PCT_GRADE (76) tells the device to scale by 0.1
+  uint16_t incline_raw = (uint16_t)(incline_percent * 10);
+  uint8_t data[] = {(uint8_t)(incline_raw & 0xFF), (uint8_t)(incline_raw >> 8), CSAFE_UNIT_TENTH_PCT_GRADE};
   send_command(CSAFE_CMD_SET_GRADE, 3, data);
 }
 
@@ -198,21 +202,41 @@ void TreadmillCSAFEParser::process_packet() {
   switch (command) {
     case CSAFE_CMD_GET_SPEED:
       // Handle speed response (3 data bytes: LSB, MSB, unit)
+      // The unit byte indicates the scaling: 0x11 = 1/10th mph (0.1 mph steps)
       if (length >= 3) {
+        uint8_t unit = packet_buffer_[6];
         uint16_t speed_raw = packet_buffer_[4] | (packet_buffer_[5] << 8);
-        float speed = speed_raw / 100.0f;
+        float speed;
+        if (unit == CSAFE_UNIT_TENTH_MPH) {
+          speed = speed_raw / 10.0f;  // 0.1 mph resolution
+        } else if (unit == CSAFE_UNIT_MPH) {
+          speed = speed_raw / 1.0f;   // 1 mph resolution (legacy)
+        } else {
+          ESP_LOGW(TAG, "Unknown speed unit: 0x%02X, assuming 1/10th mph", unit);
+          speed = speed_raw / 10.0f;
+        }
         last_speed_ = speed;
-        ESP_LOGD(TAG, "Received speed: %.2f mph", speed);
+        ESP_LOGD(TAG, "Received speed: %.2f mph (unit: 0x%02X, raw: %u)", speed, unit, speed_raw);
       }
       break;
 
     case CSAFE_CMD_GET_GRADE:
       // Handle grade/incline response (3 data bytes: LSB, MSB, unit)
+      // The unit byte indicates the scaling: 76 = 0.1% grade
       if (length >= 3) {
+        uint8_t unit = packet_buffer_[6];
         uint16_t grade_raw = packet_buffer_[4] | (packet_buffer_[5] << 8);
-        float grade = grade_raw / 100.0f;
+        float grade;
+        if (unit == CSAFE_UNIT_TENTH_PCT_GRADE) {
+          grade = grade_raw / 10.0f;  // 0.1% grade resolution
+        } else if (unit == CSAFE_UNIT_PCT_GRADE) {
+          grade = grade_raw / 1.0f;   // 1% grade resolution (legacy)
+        } else {
+          ESP_LOGW(TAG, "Unknown grade unit: 0x%02X, assuming 0.1%% grade", unit);
+          grade = grade_raw / 10.0f;
+        }
         last_incline_ = grade;
-        ESP_LOGD(TAG, "Received grade/incline: %.2f%%", grade);
+        ESP_LOGD(TAG, "Received grade/incline: %.2f%% (unit: 0x%02X, raw: %u)", grade, unit, grade_raw);
       }
       break;
 

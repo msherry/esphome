@@ -95,6 +95,14 @@ number:
     optimistic: true
     step: 1
 
+pid_controller:
+  - id: hr_pid
+    kp: 0.05
+    ki: 0.001
+    kd: 0.02
+    output_min: 3.0
+    output_max: 12.0
+
 sensor:
   - platform: ble_client
     type: characteristic
@@ -135,10 +143,8 @@ interval:
   - interval: 15s
     then:
       - lambda: |-
-          float target = id(target_hr).state;
-          float speed = id(treadmill_speed);
-
           float hr = id(hr_sensor).state;
+          float target = id(target_hr).state;
 
           if (isnan(hr)) {
             ESP_LOGD("pid", "No HR data");
@@ -147,29 +153,9 @@ interval:
 
           ESP_LOGD("pid", "HR: %.0f  Target HR: %.0f", hr, target);
 
-          // Within 5 BPM of target, do nothing
-          if (hr >= target - 5 && hr <= target + 5) {
-            ESP_LOGD("pid", "Leaving speed unchanged at %.1f mph", speed);
-            return;
-          }
-
-
-          if (hr > target) {
-            speed -= 0.1;
-            if (hr >= target + 20) {
-              // Even more
-              speed -= 0.1;
-            }
-          } else if (hr < target) {
-            speed += 0.1;
-            if (hr <= target - 20) {
-              // More
-              speed += 0.1;
-            }
-          }
-
-          if (speed > 12.0) speed = 12.0;
-          if (speed < 3.0) speed = 3.0;
+          // Use PID controller to calculate target speed
+          // Error = Target HR - Current HR (positive means we need to increase speed)
+          float speed = id(hr_pid).update(target, hr, millis());
 
           ESP_LOGD("pid", "Setting speed to %.1f mph", speed);
           id(set_treadmill_speed).execute(speed);
@@ -180,10 +166,5 @@ script:
       speed: float
     then:
       - lambda: |-
-          // speed is PID output speed
-
-          if (speed > 12.0) speed = 12.0;
-          if (speed < 3.0) speed = 3.0;
-
           // Send CSAFE command to set the speed
           id(csafe_parser).set_speed(speed);

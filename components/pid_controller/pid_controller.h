@@ -39,9 +39,5 @@ class PIDController : public Component {
   static const float INTEGRAL_LIMIT;
 };
 
-// Global instance for backward compatibility
-// Usage: treadmill_pid.update(setpoint, measured, millis());
-extern esphome::pid_controller::PIDController treadmill_pid;
-
 }  // namespace pid_controller
 }  // namespace esphome

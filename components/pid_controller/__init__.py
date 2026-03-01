@@ -15,7 +15,7 @@ CONF_KD = "kd"
 CONF_OUTPUT_MIN = "output_min"
 CONF_OUTPUT_MAX = "output_max"
 
-CONFIG_SCHEMA = cv.Schema({
+CONFIG_SCHEMA = cv.ensure_list(cv.Schema({
     cv.GenerateID(): cv.declare_id(PIDController),
 
     cv.Required(CONF_KP): cv.float_,
@@ -23,16 +23,17 @@ CONFIG_SCHEMA = cv.Schema({
     cv.Required(CONF_KD): cv.float_,
     cv.Required(CONF_OUTPUT_MIN): cv.float_,
     cv.Required(CONF_OUTPUT_MAX): cv.float_,
-}).extend(cv.COMPONENT_SCHEMA)
+}).extend(cv.COMPONENT_SCHEMA))
 
 
 async def to_code(config):
-    var = cg.new_Pvariable(
-        config[CONF_ID],
-        config[CONF_KP],
-        config[CONF_KI],
-        config[CONF_KD],
-        config[CONF_OUTPUT_MIN],
-        config[CONF_OUTPUT_MAX]
-    )
-    await cg.register_component(var, config)
+    for conf in config:
+        var = cg.new_Pvariable(
+            conf[CONF_ID],
+            conf[CONF_KP],
+            conf[CONF_KI],
+            conf[CONF_KD],
+            conf[CONF_OUTPUT_MIN],
+            conf[CONF_OUTPUT_MAX]
+        )
+        await cg.register_component(var, conf)

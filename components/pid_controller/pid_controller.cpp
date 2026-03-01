@@ -54,8 +54,5 @@ float PIDController::update(float setpoint, float measured, uint32_t now_ms) {
   return output;
 }
 
-// Global instance for backward compatibility with same parameters
-PIDController treadmill_pid(0.05f, 0.01f, 0.02f, 2.0f, 10.0f);
-
 }  // namespace pid_controller
 }  // namespace esphome
