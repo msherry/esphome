@@ -1,13 +1,11 @@
+external_components:
+  - source:
+      type: local
+      path: components
+
 esphome:
   includes:
     - treadmill_controller.h
-    - treadmill_csafe_parser.h
-  on_boot:
-    then:
-      - lambda: |-
-          CSAFEParser *csafe = new CSAFEParser(id(treadmill_bus));
-          App.register_component(csafe);
-          CSAFEParser::set_instance(csafe);
 
 esp32:
   board: esp32dev
@@ -39,6 +37,10 @@ uart:
   tx_pin: GPIO17
   rx_pin: GPIO16
   baud_rate: 38400
+
+treadmill_csafe_parser:
+  id: csafe_parser
+  uart_id: treadmill_bus
 
 # For reading heart rate data
 esp32_ble_tracker:
@@ -123,10 +125,10 @@ interval:
   - interval: 5s
     then:
       - lambda: |-
-          CSAFE_GET_INSTANCE()->get_speed();
+          id(csafe_parser).get_speed();
       - delay: 1s  # Wait for response
       - lambda: |-
-          float polled_speed = CSAFE_GET_INSTANCE()->get_last_speed();
+          float polled_speed = id(csafe_parser).get_last_speed();
           id(treadmill_speed) = polled_speed;
           ESP_LOGD("csafe", "Polled speed: %.2f mph", polled_speed);
 
@@ -184,4 +186,4 @@ script:
           if (speed < 3.0) speed = 3.0;
 
           // Send CSAFE command to set the speed
-          CSAFE_GET_INSTANCE()->set_speed(speed);
+          id(csafe_parser).set_speed(speed);
