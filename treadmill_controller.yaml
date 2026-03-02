@@ -23,10 +23,6 @@ logger:
   level: DEBUG
 
 globals:
-  - id: treadmill_speed
-    type: float
-    restore_value: no
-    initial_value: '0.0'
   # Accumulator and count for hr average
   - id: hr_sum
     type: float
@@ -40,6 +36,15 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  # Actuator controls
+  - id: desired_speed
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: commanded_speed
+    type: float
+    restore_value: no
+    initial_value: '0.0'
 
 wifi:
   fast_connect: true
@@ -47,9 +52,13 @@ wifi:
 # Setup the UART for the MAX3232 connection
 uart:
   id: treadmill_bus
-  tx_pin: GPIO17
-  rx_pin: GPIO16
-  baud_rate: 38400
+  tx_pin:
+    number: GPIO17
+    inverted: true
+  rx_pin:
+    number: GPIO16
+    inverted: true
+  baud_rate: 115200
 
 treadmill_csafe_parser:
   id: csafe_parser
@@ -191,18 +200,18 @@ sensor:
           }
 
 
-# Poll treadmill speed every 5 seconds to stay in sync
+# Poll treadmill speed every N seconds to stay in sync
 interval:
   # Get the treadmill's reported speed
-  - interval: 5s
+  - interval: 30s
     then:
       - lambda: |-
-          id(csafe_parser).get_speed();
-      - delay: 1s  # Wait for response
-      - lambda: |-
           float polled_speed = id(csafe_parser).get_last_speed();
-          id(treadmill_speed) = polled_speed;
-          // ESP_LOGD("csafe", "Polled speed: %.2f mph", polled_speed);
+          if (abs(polled_speed - id(commanded_speed)) > 0.3f) {
+            ESP_LOGI("actuator", "Speed mismatch: commanded %.1f, actual %.1f — syncing",
+                     id(commanded_speed), polled_speed);
+            id(commanded_speed) = polled_speed;
+          }
 
   # PID update
   - interval: 15s
@@ -220,8 +229,8 @@ interval:
             ESP_LOGD("pid", "Updating PID controller");
             float speed = id(treadmill_pid).update(target, id(hr_average), millis());
 
-            ESP_LOGD("pid", "Setting speed to %.1f mph", speed);
-            id(set_treadmill_speed).execute(speed);
+            id(desired_speed) = speed;
+            ESP_LOGD("pid", "Setting desired speed to %.1f mph", speed);
 
             // Reset accumulator
             id(hr_sum) = 0.0;
@@ -230,6 +239,33 @@ interval:
             ESP_LOGI("pid", "No HR samples received in last N seconds");
             return;
           }
+  # Actuator - update treadmill speed based on desired speed
+  - interval: 10s
+    then:
+      - lambda: |-
+          float delta = id(desired_speed) - id(commanded_speed);
+          float abs_delta = abs(delta);
+          if (abs_delta < 0.05f) return; // deadband
+
+          float step;
+          if (abs_delta > 1.0f) step = 0.3f;
+          else if (abs_delta > 0.5f) step = 0.2f;
+          else if (abs_delta > 0.2f) step = 0.1f;
+          else step = 0.05f;
+
+          // Step toward desired, don't overshoot
+          float new_speed;
+          if (delta > 0) {
+            new_speed = min(id(commanded_speed) + step, id(desired_speed));
+          } else {
+            new_speed = max(id(commanded_speed) - step, id(desired_speed));
+          }
+
+          id(commanded_speed) = new_speed;
+          ESP_LOGI("actuator", "Stepping speed: %.2f -> %.2f (desired: %.2f, delta was: %.2f)",
+                   id(commanded_speed), new_speed, id(desired_speed), delta);
+
+          id(set_treadmill_speed).execute(new_speed);
 
 script:
   - id: set_treadmill_speed
@@ -238,4 +274,5 @@ script:
     then:
       - lambda: |-
           // Send CSAFE command to set the speed
-          id(csafe_parser).set_speed(speed);
+          //id(csafe_parser).set_speed(speed);
+          id(csafe_parser).get_speed();  // response handled async by loop()

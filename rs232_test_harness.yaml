@@ -26,12 +26,14 @@ logger:
 # UART configuration matching treadmill_controller.yaml
 uart:
   id: uart_bus
-  tx_pin: GPIO17
+  tx_pin:
+    number: GPIO17
+    inverted: true
   rx_pin:
     number: GPIO16
-    inverted: false
+    inverted: true
 
-  baud_rate: 38400
+  baud_rate: 115200
   rx_buffer_size: 512  # Increased for safety
   # debug:
   #   direction: BOTH
