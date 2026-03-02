@@ -40,11 +40,12 @@ namespace esphome {
             if (integral_ > INTEGRAL_LIMIT) integral_ = INTEGRAL_LIMIT;
             if (integral_ < -INTEGRAL_LIMIT) integral_ = -INTEGRAL_LIMIT;
 
-            ESP_LOGD(TAG, "PID integral: %.3f", integral_);
-
             float derivative = (error - prev_error_) / dt;
 
             float output = kp_ * error + ki_ * integral_ + kd_ * derivative;
+
+            ESP_LOGD(TAG, "proportional: %.0f,  integral: %.0f,  derivative: %.0f,  output: %.1f",
+                    error, integral_, derivative, output);
 
             prev_error_ = error;
 

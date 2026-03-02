@@ -99,11 +99,11 @@ font:
   - file: 'SourceSansPro-Light.ttf'
     id: font1
     size: 22
-  - file: 'materialdesignicons-webfont.ttf'
-    id: font2
-    size: 16
-    glyphs:
-      - "\U000F1A0A" # "triangle-small-up"
+  # - file: 'materialdesignicons-webfont.ttf'
+  #   id: font2
+  #   size: 16
+  #   glyphs:
+  #     - "\U000F1A0A" # "triangle-small-up"
   - file: 'materialdesignicons-webfont.ttf'
     id: font4
     size: 34
@@ -130,14 +130,14 @@ display:
     lambda: |-
       float speed = id(treadmill_pid).get_output_speed();
       auto run_glyph = speed >= 5.0 ? "\U000F046E" : "\U000F070E";
+      // Heart glyph
+      it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, "\U000F02D1");
+      // Heart rate
+      it.printf(40, 0, id(font1), "%.0f", id(hr_average));
       // Run glyph
       it.printf(0, it.get_height(), id(font4), TextAlign::BASELINE_LEFT, run_glyph);
       // Print current speed
-      it.printf(32, it.get_height() - 26, id(font1), "%.1f", speed);
-      // Heart glyph
-      it.printf(it.get_width() - 64, it.get_height(), id(font4), TextAlign::BASELINE_LEFT, "\U000F02D1");
-      // Heart rate
-      it.printf(it.get_width() - 30, it.get_height() - 26, id(font1), "%.0f", id(hr_average));
+      it.printf(40, it.get_height() - 26, id(font1), "%.1f", speed);
 
 
 number:
@@ -217,6 +217,7 @@ interval:
 
             // Use PID controller to calculate target speed
             // Error = Target HR - Current HR (positive means we need to increase speed)
+            ESP_LOGD("pid", "Updating PID controller");
             float speed = id(treadmill_pid).update(target, id(hr_average), millis());
 
             ESP_LOGD("pid", "Setting speed to %.1f mph", speed);
