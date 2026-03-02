@@ -22,6 +22,8 @@ class PIDController : public Component {
   void set_kd(float kd) { kd_ = kd; }
   void set_output_limits(float out_min, float out_max);
 
+    float get_output_speed();
+
  protected:
   float kp_;
   float ki_;
@@ -33,6 +35,8 @@ class PIDController : public Component {
 
   float out_min_;
   float out_max_;
+
+    float output_speed_ = 0;
 
   uint32_t last_time_ = 0;
 

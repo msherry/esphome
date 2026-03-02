@@ -83,6 +83,44 @@ ble_client:
 #  - receive/parse
 #  - encode/transmit
 
+font:
+  - file: 'SourceSansPro-Light.ttf'
+    id: font1
+    size: 24
+  - file: 'materialdesignicons-webfont.ttf'
+    id: font4
+    size: 36
+    glyphs:
+      - "\U000F02D1" # "heart"
+      - "\U000F02D5" # "heart-outline"
+      - "\U000F046E" # "run-fast"
+      - "\U000F070E" # "run"
+
+
+i2c:
+  sda: GPIO21
+  scl: GPIO22
+  scan: false
+
+display:
+  - id: main_display
+    platform: ssd1306_i2c
+    model: "SSD1306 128x64"
+    rotation: 180
+    # reset_pin: D0
+    address: 0x3C
+    show_test_card: false
+    lambda: |-
+      // Run glyph
+      it.printf(0, it.get_height(), id(font4), TextAlign::BASELINE_LEFT, "\U000F046E");
+      // Print current speed
+      it.printf(36, it.get_height() - 24, id(font1), "%.1f", id(hr_pid).get_output_speed());
+      // Heart glyph
+      it.printf(it.get_width() - 64, it.get_height(), id(font4), TextAlign::BASELINE_LEFT, "\U000F02D1");
+      // Heart rate
+      it.printf(it.get_width() - 32, it.get_height() - 24, id(font1), "%.0f", id(hr_sensor).state);
+
+
 number:
   - platform: template
     name: "Target heart rate"
@@ -138,7 +176,7 @@ interval:
       - lambda: |-
           float polled_speed = id(csafe_parser).get_last_speed();
           id(treadmill_speed) = polled_speed;
-          ESP_LOGD("csafe", "Polled speed: %.2f mph", polled_speed);
+          // ESP_LOGD("csafe", "Polled speed: %.2f mph", polled_speed);
 
   - interval: 15s
     then:
@@ -147,6 +185,7 @@ interval:
           float target = id(target_hr).state;
 
           if (isnan(hr)) {
+            // Safest to do nothing here
             ESP_LOGD("pid", "No HR data");
             return;
           }

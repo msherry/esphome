@@ -175,6 +175,12 @@ bool TreadmillCSAFEParser::validate_checksum() {
 }
 
 void TreadmillCSAFEParser::process_packet() {
+  // Log all bytes in the packet
+  ESP_LOGD(TAG, "Received packet (%zu bytes):", packet_buffer_.size());
+  for (size_t i = 0; i < packet_buffer_.size(); i++) {
+    ESP_LOGD(TAG, "  [%zu] 0x%02X", i, packet_buffer_[i]);
+  }
+
   // Packet structure after unstuffing: START | CMD | LEN | DATA... | CHECKSUM | END
   if (packet_buffer_.size() < 5) {  // START + CMD + LEN + CHECKSUM + END minimum
     ESP_LOGD(TAG, "Packet too short: %zu bytes", packet_buffer_.size());
@@ -193,9 +199,9 @@ void TreadmillCSAFEParser::process_packet() {
   uint8_t length = packet_buffer_[2];
 
   // Validate length - packet should have: START + CMD + LEN + DATA(length bytes) + CHECKSUM + END
-  if (packet_buffer_.size() != 4 + length) {
+  if (packet_buffer_.size() != 5 + length) {
     ESP_LOGD(TAG, "Length mismatch: header says %d, actual data + checksum = %zu",
-              length, packet_buffer_.size() - 4);
+              length, packet_buffer_.size() - 5);
     return;
   }
 
