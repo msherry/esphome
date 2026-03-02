@@ -176,10 +176,10 @@ bool TreadmillCSAFEParser::validate_checksum() {
 
 void TreadmillCSAFEParser::process_packet() {
   // Log all bytes in the packet
-  ESP_LOGD(TAG, "Received packet (%zu bytes):", packet_buffer_.size());
-  for (size_t i = 0; i < packet_buffer_.size(); i++) {
-    ESP_LOGD(TAG, "  [%zu] 0x%02X", i, packet_buffer_[i]);
-  }
+  // ESP_LOGD(TAG, "Received packet (%zu bytes):", packet_buffer_.size());
+  // for (size_t i = 0; i < packet_buffer_.size(); i++) {
+  //   ESP_LOGD(TAG, "  [%zu] 0x%02X", i, packet_buffer_[i]);
+  // }
 
   // Packet structure after unstuffing: START | CMD | LEN | DATA... | CHECKSUM | END
   if (packet_buffer_.size() < 5) {  // START + CMD + LEN + CHECKSUM + END minimum

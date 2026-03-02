@@ -6,7 +6,7 @@ namespace esphome {
 
         static const char *TAG = "pid_controller";
 
-        const float PIDController::INTEGRAL_LIMIT = 100.0f;
+        const float PIDController::INTEGRAL_LIMIT = 2000.0f;
 
         PIDController::PIDController(float kp, float ki, float kd, float out_min, float out_max)
             : kp_(kp), ki_(ki), kd_(kd), out_min_(out_min), out_max_(out_max) {}
@@ -39,6 +39,8 @@ namespace esphome {
             // anti-windup clamp
             if (integral_ > INTEGRAL_LIMIT) integral_ = INTEGRAL_LIMIT;
             if (integral_ < -INTEGRAL_LIMIT) integral_ = -INTEGRAL_LIMIT;
+
+            ESP_LOGD(TAG, "PID integral: %.3f", integral_);
 
             float derivative = (error - prev_error_) / dt;
 

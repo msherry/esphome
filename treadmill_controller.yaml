@@ -27,6 +27,19 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  # Accumulator and count for hr average
+  - id: hr_sum
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: hr_count
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: hr_average
+    type: float
+    restore_value: no
+    initial_value: '0.0'
 
 wifi:
   fast_connect: true
@@ -78,7 +91,6 @@ ble_client:
 
 # TODO: display screen
 #  - connecting status indicator
-#  - live HR when connected
 # TODO: CSAFE
 #  - receive/parse
 #  - encode/transmit
@@ -86,10 +98,15 @@ ble_client:
 font:
   - file: 'SourceSansPro-Light.ttf'
     id: font1
-    size: 24
+    size: 22
+  - file: 'materialdesignicons-webfont.ttf'
+    id: font2
+    size: 16
+    glyphs:
+      - "\U000F1A0A" # "triangle-small-up"
   - file: 'materialdesignicons-webfont.ttf'
     id: font4
-    size: 36
+    size: 34
     glyphs:
       - "\U000F02D1" # "heart"
       - "\U000F02D5" # "heart-outline"
@@ -111,14 +128,16 @@ display:
     address: 0x3C
     show_test_card: false
     lambda: |-
+      float speed = id(treadmill_pid).get_output_speed();
+      auto run_glyph = speed >= 5.0 ? "\U000F046E" : "\U000F070E";
       // Run glyph
-      it.printf(0, it.get_height(), id(font4), TextAlign::BASELINE_LEFT, "\U000F046E");
+      it.printf(0, it.get_height(), id(font4), TextAlign::BASELINE_LEFT, run_glyph);
       // Print current speed
-      it.printf(36, it.get_height() - 24, id(font1), "%.1f", id(hr_pid).get_output_speed());
+      it.printf(32, it.get_height() - 26, id(font1), "%.1f", speed);
       // Heart glyph
       it.printf(it.get_width() - 64, it.get_height(), id(font4), TextAlign::BASELINE_LEFT, "\U000F02D1");
       // Heart rate
-      it.printf(it.get_width() - 32, it.get_height() - 24, id(font1), "%.0f", id(hr_sensor).state);
+      it.printf(it.get_width() - 30, it.get_height() - 26, id(font1), "%.0f", id(hr_average));
 
 
 number:
@@ -134,7 +153,7 @@ number:
     step: 1
 
 pid_controller:
-  - id: hr_pid
+  - id: treadmill_pid
     kp: 0.05
     ki: 0.001
     kd: 0.02
@@ -164,10 +183,17 @@ sensor:
           return (x[0] & 0x01) ? (float)((x[2] << 8) | x[1]) : (float)x[1];
         }
         return NAN;
+    on_value:
+      - lambda: |
+          if (!isnan(x)) {
+            id(hr_sum) += x;
+            id(hr_count) += 1;
+          }
 
 
 # Poll treadmill speed every 5 seconds to stay in sync
 interval:
+  # Get the treadmill's reported speed
   - interval: 5s
     then:
       - lambda: |-
@@ -178,26 +204,31 @@ interval:
           id(treadmill_speed) = polled_speed;
           // ESP_LOGD("csafe", "Polled speed: %.2f mph", polled_speed);
 
+  # PID update
   - interval: 15s
     then:
       - lambda: |-
-          float hr = id(hr_sensor).state;
-          float target = id(target_hr).state;
+          if (id(hr_count) > 0) {
+            id(hr_average) = id(hr_sum) / id(hr_count);
+            ESP_LOGI("pid", "HR average over last 15s: %.0f BPM from %d samples",
+                     id(hr_average), (int)id(hr_count));
 
-          if (isnan(hr)) {
-            // Safest to do nothing here
-            ESP_LOGD("pid", "No HR data");
+            float target = id(target_hr).state;
+
+            // Use PID controller to calculate target speed
+            // Error = Target HR - Current HR (positive means we need to increase speed)
+            float speed = id(treadmill_pid).update(target, id(hr_average), millis());
+
+            ESP_LOGD("pid", "Setting speed to %.1f mph", speed);
+            id(set_treadmill_speed).execute(speed);
+
+            // Reset accumulator
+            id(hr_sum) = 0.0;
+            id(hr_count) = 0.0;
+          } else {
+            ESP_LOGI("pid", "No HR samples received in last N seconds");
             return;
           }
-
-          ESP_LOGD("pid", "HR: %.0f  Target HR: %.0f", hr, target);
-
-          // Use PID controller to calculate target speed
-          // Error = Target HR - Current HR (positive means we need to increase speed)
-          float speed = id(hr_pid).update(target, hr, millis());
-
-          ESP_LOGD("pid", "Setting speed to %.1f mph", speed);
-          id(set_treadmill_speed).execute(speed);
 
 script:
   - id: set_treadmill_speed
