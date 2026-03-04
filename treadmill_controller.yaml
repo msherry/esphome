@@ -108,11 +108,14 @@ font:
   - file: 'SourceSansPro-Light.ttf'
     id: font1
     size: 22
-  # - file: 'materialdesignicons-webfont.ttf'
-  #   id: font2
-  #   size: 16
-  #   glyphs:
-  #     - "\U000F1A0A" # "triangle-small-up"
+  - file: 'SourceSansPro-Light.ttf'
+    id: font2
+    size: 12
+  - file: 'materialdesignicons-webfont.ttf'
+    id: font3
+    size: 16
+    glyphs:
+      - "\U000F19B0" # "arrow-right-thin"
   - file: 'materialdesignicons-webfont.ttf'
     id: font4
     size: 34
@@ -137,16 +140,40 @@ display:
     address: 0x3C
     show_test_card: false
     lambda: |-
-      float speed = id(treadmill_pid).get_output_speed();
+
+      int screen_height = it.get_height();
+      int screen_width = it.get_width();
+      // HR zone rectangle
+      float zone_gap = 5;
+      float zone_height = screen_height - (2 * zone_gap);
+
+      // Position within zone calcs
+      float zone_spread = 2 * id(target_zone_width).state;
+      float zone_pct = min(1.0f, max(0.0f,
+                           (id(hr_average) - (id(target_hr).state - id(target_zone_width).state))
+                           / zone_spread));
+
+      float speed = id(commanded_speed);
       auto run_glyph = speed >= 5.0 ? "\U000F046E" : "\U000F070E";
       // Heart glyph
       it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, "\U000F02D1");
       // Heart rate
       it.printf(40, 0, id(font1), "%.0f", id(hr_average));
       // Run glyph
-      it.printf(0, it.get_height(), id(font4), TextAlign::BASELINE_LEFT, run_glyph);
+      it.printf(0, screen_height, id(font4), TextAlign::BASELINE_LEFT, run_glyph);
       // Print current speed
-      it.printf(40, it.get_height() - 26, id(font1), "%.1f", speed);
+      it.printf(40, screen_height - 26, id(font1), "%.1f", speed);
+      // Zone vertical bar
+      it.filled_rectangle(screen_width-32, (screen_height - zone_height) / 2, 10, zone_height);
+      // Zone low value
+      it.printf(screen_width-20, (screen_height - zone_height) / 2 - 3, id(font2), TextAlign::TOP_LEFT,
+                "%.0f", id(target_hr).state - id(target_zone_width).state);
+      // Zone high value
+      it.printf(screen_width-20, (screen_height - zone_gap), id(font2), TextAlign::BASELINE_LEFT,
+                "%.0f", id(target_hr).state + id(target_zone_width).state);
+      // HR zone indicator
+      it.printf(screen_width-46, zone_gap + zone_pct * (zone_height - 3) - 5,
+                id(font3), TextAlign::TOP_LEFT, "\U000F19B0");
 
 
 number:
@@ -157,6 +184,16 @@ number:
     icon: 'mdi:heart-pulse'
     min_value: 60
     max_value: 170
+    restore_value: true
+    optimistic: true
+    step: 1
+  - platform: template
+    name: "HR zone width"
+    id: target_zone_width
+    unit_of_measurement: "BPM"
+    icon: 'mdi:heart-pulse'
+    min_value: 5
+    max_value: 20
     restore_value: true
     optimistic: true
     step: 1
@@ -261,9 +298,9 @@ interval:
             new_speed = max(id(commanded_speed) - step, id(desired_speed));
           }
 
-          id(commanded_speed) = new_speed;
           ESP_LOGI("actuator", "Stepping speed: %.2f -> %.2f (desired: %.2f, delta was: %.2f)",
                    id(commanded_speed), new_speed, id(desired_speed), delta);
+          id(commanded_speed) = new_speed;
 
           id(set_treadmill_speed).execute(new_speed);
 
