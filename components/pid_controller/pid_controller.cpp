@@ -67,9 +67,9 @@ namespace esphome {
             last_output_ = output;
 
             // Debugging
-            last_p_ = error;
-            last_i_ = integral_;
-            last_d_ = derivative;
+            last_p_ = kp_ * error;
+            last_i_ = ki_ * integral_;
+            last_d_ = kd_ * derivative;
 
             return output;
         }

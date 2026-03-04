@@ -335,7 +335,7 @@ interval:
             return;
           }
   # Actuator - update treadmill speed based on desired speed
-  - interval: 10s
+  - interval: 15s
     then:
       - lambda: |-
           // Do nothing if the workout is not active
@@ -389,6 +389,27 @@ switch:
     name: "Workout active"
     optimistic: true
     turn_on_action:
+      # Reset PID controller
+      - lambda: |
+          id(treadmill_pid).reset();
+      # Reset actuator
+      - globals.set:
+          id: desired_speed
+          value: '0'
+      - globals.set:
+          id: commanded_speed
+          value: '0'
+      # Reset heart rate stats
+      - globals.set:
+          id: hr_sum
+          value: '0'
+      - globals.set:
+          id: hr_count
+          value: '0'
+      - globals.set:
+          id: hr_average
+          value: '0'
+    turn_off_action:
       # Reset PID controller
       - lambda: |
           id(treadmill_pid).reset();
