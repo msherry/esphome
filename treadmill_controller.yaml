@@ -239,16 +239,16 @@ sensor:
 
 # Poll treadmill speed every N seconds to stay in sync
 interval:
-  # Get the treadmill's reported speed
-  - interval: 30s
-    then:
-      - lambda: |-
-          float polled_speed = id(csafe_parser).get_last_speed();
-          if (abs(polled_speed - id(commanded_speed)) > 0.3f) {
-            ESP_LOGI("actuator", "Speed mismatch: commanded %.1f, actual %.1f — syncing",
-                     id(commanded_speed), polled_speed);
-            id(commanded_speed) = polled_speed;
-          }
+  # # Get the treadmill's reported speed
+  # - interval: 30s
+  #   then:
+  #     - lambda: |-
+  #         float polled_speed = id(csafe_parser).get_last_speed();
+  #         if (abs(polled_speed - id(commanded_speed)) > 0.3f) {
+  #           ESP_LOGI("actuator", "Speed mismatch: commanded %.1f, actual %.1f — syncing",
+  #                    id(commanded_speed), polled_speed);
+  #           id(commanded_speed) = polled_speed;
+  #         }
 
   # PID update
   - interval: 15s
@@ -285,7 +285,8 @@ interval:
           if (abs_delta < 0.05f) return; // deadband
 
           float step;
-          if (abs_delta > 1.0f) step = 0.3f;
+          if (abs_delta > 2.0f) step = 1.0f;
+          else if (abs_delta > 1.0f) step = 0.3f;
           else if (abs_delta > 0.5f) step = 0.2f;
           else if (abs_delta > 0.2f) step = 0.1f;
           else step = 0.05f;

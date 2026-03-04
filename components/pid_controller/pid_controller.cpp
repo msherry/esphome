@@ -55,12 +55,7 @@ namespace esphome {
 
             last_output_ = output;
 
-            output_speed_ = output;
             return output;
-        }
-
-        float PIDController::get_output_speed() {
-            return output_speed_;
         }
 
     }  // namespace pid_controller
