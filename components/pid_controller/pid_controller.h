@@ -17,6 +17,9 @@ class PIDController : public Component {
   void reset();
 
   float update(float setpoint, float measured, uint32_t now_ms);
+  float get_proportional();
+  float get_integral();
+  float get_derivative();
 
   void set_kp(float kp) { kp_ = kp; }
   void set_ki(float ki) { ki_ = ki; }
@@ -36,6 +39,9 @@ class PIDController : public Component {
   float out_max_;
 
   uint32_t last_time_ = 0;
+  float last_p_ = 0;
+  float last_i_ = 0;
+  float last_d_ = 0;
 
   static const float INTEGRAL_LIMIT;
 };

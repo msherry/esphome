@@ -21,6 +21,8 @@ packages:
 
 logger:
   level: DEBUG
+  logs:
+    sensor: INFO
 
 globals:
   # Accumulator and count for hr average
@@ -233,6 +235,49 @@ sensor:
             id(hr_count) += 1;
           }
 
+  - platform: template
+    name: "HR Average"
+    id: hr_average_sensor
+    unit_of_measurement: "BPM"
+    accuracy_decimals: 0
+
+  # PID debugging
+  - platform: template
+    name: "PID Error"
+    id: pid_error_sensor
+    unit_of_measurement: "BPM"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "PID Proportional"
+    id: pid_p_sensor
+    unit_of_measurement: "mph"
+    accuracy_decimals: 2
+
+  - platform: template
+    name: "PID Integral"
+    id: pid_i_sensor
+    unit_of_measurement: "mph"
+    accuracy_decimals: 2
+
+  - platform: template
+    name: "PID Derivative"
+    id: pid_d_sensor
+    unit_of_measurement: "mph"
+    accuracy_decimals: 2
+
+  - platform: template
+    name: "PID Desired Speed"
+    id: pid_desired_sensor
+    unit_of_measurement: "mph"
+    accuracy_decimals: 1
+
+  - platform: template
+    name: "PID Commanded Speed"
+    id: pid_commanded_sensor
+    unit_of_measurement: "mph"
+    accuracy_decimals: 1
+
 
 # Poll treadmill speed every N seconds to stay in sync
 interval:
@@ -259,10 +304,11 @@ interval:
 
           if (id(hr_count) > 0) {
             id(hr_average) = id(hr_sum) / id(hr_count);
+            float target = id(target_hr).state;
+            float error = target - id(hr_average);
+
             ESP_LOGI("pid", "HR average over last 15s: %.0f BPM from %d samples",
                      id(hr_average), (int)id(hr_count));
-
-            float target = id(target_hr).state;
 
             // Use PID controller to calculate target speed
             // Error = Target HR - Current HR (positive means we need to increase speed)
@@ -271,6 +317,15 @@ interval:
 
             id(desired_speed) = speed;
             ESP_LOGD("pid", "Setting desired speed to %.1f mph", speed);
+
+            // Publish stats to HA
+            id(hr_average_sensor).publish_state(id(hr_average));
+            // PID debugging
+            id(pid_error_sensor).publish_state(error);
+            id(pid_p_sensor).publish_state(id(treadmill_pid).get_proportional());
+            id(pid_i_sensor).publish_state(id(treadmill_pid).get_integral());
+            id(pid_d_sensor).publish_state(id(treadmill_pid).get_derivative());
+            id(pid_desired_sensor).publish_state(speed);
 
             // Reset accumulator
             id(hr_sum) = 0.0;
@@ -310,6 +365,9 @@ interval:
           id(commanded_speed) = new_speed;
 
           id(set_treadmill_speed).execute(new_speed);
+
+          // Publish stats to HA
+          id(pid_commanded_sensor).publish_state(id(commanded_speed));
 
 script:
   - id: set_treadmill_speed

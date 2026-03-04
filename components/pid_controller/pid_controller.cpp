@@ -20,6 +20,10 @@ namespace esphome {
             prev_error_ = 0;
             last_time_ = 0;
             last_output_ = 0;
+
+            last_p_ = 0;
+            last_i_ = 0;
+            last_d_ = 0;
         }
 
         float PIDController::update(float setpoint, float measured, uint32_t now_ms) {
@@ -62,8 +66,15 @@ namespace esphome {
 
             last_output_ = output;
 
+            // Debugging
+            last_p_ = error;
+            last_i_ = integral_;
+            last_d_ = derivative;
+
             return output;
         }
-
+        float PIDController::get_proportional() {return last_p_;}
+        float PIDController::get_integral() {return last_i_;}
+        float PIDController::get_derivative() {return last_d_;}
     }  // namespace pid_controller
 }  // namespace esphome
