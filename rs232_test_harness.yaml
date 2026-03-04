@@ -33,11 +33,31 @@ uart:
     number: GPIO16
     inverted: true
 
-  baud_rate: 115200
+  baud_rate: 9600
   rx_buffer_size: 512  # Increased for safety
   # debug:
   #   direction: BOTH
   #   dummy_receiver: true
+
+# Baud rate selector
+select:
+  - platform: template
+    name: "UART Baud Rate"
+    id: baud_rate_select
+    options:
+      - "9600"
+      - "19200"
+      - "38400"
+      - "57600"
+      - "115200"
+    optimistic: true
+    restore_value: True
+    initial_option: "9600"
+    icon: mdi:swap-horizontal
+    set_action:
+      - lambda: |-
+          id(uart_bus).set_baud_rate((uint32_t)std::stoul(x));
+          id(uart_bus).load_settings();
 
 text:
   - platform: template
