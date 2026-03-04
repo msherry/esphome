@@ -14,6 +14,7 @@ class PIDController : public Component {
   PIDController(float kp, float ki, float kd, float out_min, float out_max);
 
   void setup() override;
+  void reset();
 
   float update(float setpoint, float measured, uint32_t now_ms);
 

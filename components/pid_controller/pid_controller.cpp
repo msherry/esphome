@@ -15,6 +15,13 @@ namespace esphome {
             ESP_LOGI(TAG, "PID Controller initialized (Kp=%.3f, Ki=%.3f, Kd=%.3f)", kp_, ki_, kd_);
         }
 
+        void PIDController::reset() {
+            integral_ = 0;
+            prev_error_ = 0;
+            last_time_ = 0;
+            last_output_ = 0;
+        }
+
         float PIDController::update(float setpoint, float measured, uint32_t now_ms) {
             if (last_time_ == 0) {
                 last_time_ = now_ms;

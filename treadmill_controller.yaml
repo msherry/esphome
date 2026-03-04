@@ -100,9 +100,6 @@ ble_client:
 
 # TODO: display screen
 #  - connecting status indicator
-# TODO: CSAFE
-#  - receive/parse
-#  - encode/transmit
 
 font:
   - file: 'SourceSansPro-Light.ttf'
@@ -123,6 +120,7 @@ font:
       - "\U000F02D1" # "heart"
       - "\U000F02D5" # "heart-outline"
       - "\U000F046E" # "run-fast"
+      - "\U000F0667" # "stop-circle-outline"
       - "\U000F070E" # "run"
 
 
@@ -140,7 +138,6 @@ display:
     address: 0x3C
     show_test_card: false
     lambda: |-
-
       int screen_height = it.get_height();
       int screen_width = it.get_width();
       // HR zone rectangle
@@ -154,7 +151,7 @@ display:
                            / zone_spread));
 
       float speed = id(commanded_speed);
-      auto run_glyph = speed >= 5.0 ? "\U000F046E" : "\U000F070E";
+      auto run_glyph = id(workout_active).state ? (speed >= 5.0 ? "\U000F046E" : "\U000F070E") : "\U000F0667";
       // Heart glyph
       it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, "\U000F02D1");
       // Heart rate
@@ -243,6 +240,9 @@ interval:
   # - interval: 30s
   #   then:
   #     - lambda: |-
+  #         // Do nothing if the workout is not active
+  #         if (!id(workout_active.state)) return;
+  #
   #         float polled_speed = id(csafe_parser).get_last_speed();
   #         if (abs(polled_speed - id(commanded_speed)) > 0.3f) {
   #           ESP_LOGI("actuator", "Speed mismatch: commanded %.1f, actual %.1f — syncing",
@@ -254,6 +254,9 @@ interval:
   - interval: 15s
     then:
       - lambda: |-
+          // Do nothing if the workout is not active
+          if (!id(workout_active).state) return;
+
           if (id(hr_count) > 0) {
             id(hr_average) = id(hr_sum) / id(hr_count);
             ESP_LOGI("pid", "HR average over last 15s: %.0f BPM from %d samples",
@@ -280,6 +283,9 @@ interval:
   - interval: 10s
     then:
       - lambda: |-
+          // Do nothing if the workout is not active
+          if (!id(workout_active).state) return;
+
           float delta = id(desired_speed) - id(commanded_speed);
           float abs_delta = abs(delta);
           if (abs_delta < 0.05f) return; // deadband
@@ -311,6 +317,37 @@ script:
       speed: float
     then:
       - lambda: |-
+          // Do nothing if the workout is not active
+          if (!id(workout_active).state) return;
+
           // Send CSAFE command to set the speed
-          //id(csafe_parser).set_speed(speed);
+          // NOTE: untested, we don't have a compatible treadmill :(
+          id(csafe_parser).set_speed(speed);
           id(csafe_parser).get_speed();  // response handled async by loop()
+
+switch:
+  - id: workout_active
+    platform: template
+    name: "Workout active"
+    optimistic: true
+    turn_on_action:
+      # Reset PID controller
+      - lambda: |
+          id(treadmill_pid).reset();
+      # Reset actuator
+      - globals.set:
+          id: desired_speed
+          value: '0'
+      - globals.set:
+          id: commanded_speed
+          value: '0'
+      # Reset heart rate stats
+      - globals.set:
+          id: hr_sum
+          value: '0'
+      - globals.set:
+          id: hr_count
+          value: '0'
+      - globals.set:
+          id: hr_average
+          value: '0'
