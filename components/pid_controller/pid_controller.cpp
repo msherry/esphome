@@ -6,21 +6,27 @@ namespace esphome {
 
         static const char *TAG = "pid_controller";
 
-        const float PIDController::INTEGRAL_LIMIT = 2000.0f;
-
         PIDController::PIDController(float kp, float ki, float kd, float out_min, float out_max)
-            : kp_(kp), ki_(ki), kd_(kd), out_min_(out_min), out_max_(out_max) {}
+            : kp_(kp), ki_(ki), kd_(kd), out_min_(out_min), out_max_(out_max) {
+            // Ki will be handling most of our speed setting in the steady
+            // state, so let the integral term rise to a good fraction of max
+            INTEGRAL_LIMIT = 0.6 * out_max / ki_;
+
+            reset();
+        }
 
         void PIDController::setup() {
             ESP_LOGI(TAG, "PID Controller initialized (Kp=%.3f, Ki=%.3f, Kd=%.3f)", kp_, ki_, kd_);
         }
 
         void PIDController::reset() {
-            integral_ = 0;
+            // Don't start at a standstill
+            integral_ = 2.0 / ki_;
             prev_error_ = 0;
             last_time_ = 0;
             last_output_ = 0;
 
+            // Debugging
             last_p_ = 0;
             last_i_ = 0;
             last_d_ = 0;
@@ -37,7 +43,7 @@ namespace esphome {
 
             // If it's been too long since our last update, or a nonsensical amount
             // of time, no change.
-            if (dt < 0 || dt > 20) {
+            if (dt < 0 || dt > 30) {
                 return last_output_;
             }
 
@@ -45,7 +51,10 @@ namespace esphome {
 
             float error = setpoint - measured;
 
-            integral_ += error * dt;
+            // Only integrate if we're close to the setpoint, to prevent too much windup.
+            if (std::abs(error) <= 20) {
+                integral_ += error * dt;
+            }
 
             // anti-windup clamp
             if (integral_ > INTEGRAL_LIMIT) integral_ = INTEGRAL_LIMIT;

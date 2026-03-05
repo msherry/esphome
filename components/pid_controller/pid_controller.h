@@ -43,7 +43,7 @@ class PIDController : public Component {
   float last_i_ = 0;
   float last_d_ = 0;
 
-  static const float INTEGRAL_LIMIT;
+  float INTEGRAL_LIMIT;
 };
 
 }  // namespace pid_controller

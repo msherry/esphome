@@ -47,6 +47,11 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  # Flags
+  - id: flash_screen_time
+    type: float
+    restore_value: no
+    initial_value: '0.0'
 
 wifi:
   fast_connect: true
@@ -100,9 +105,6 @@ ble_client:
         - lambda: |-
             ESP_LOGD("ble_custom", "Disconnected from HeartCast.");
 
-# TODO: display screen
-#  - connecting status indicator
-
 font:
   - file: 'SourceSansPro-Light.ttf'
     id: font1
@@ -135,13 +137,20 @@ display:
   - id: main_display
     platform: ssd1306_i2c
     model: "SSD1306 128x64"
-    rotation: 180
+    rotation: 0
     # reset_pin: D0
     address: 0x3C
     show_test_card: false
+    update_interval: 1s
     lambda: |-
       int screen_height = it.get_height();
       int screen_width = it.get_width();
+
+      if (millis() - id(flash_screen_time) < 250) {
+        it.filled_rectangle(0, 0, screen_width, screen_height);
+        return;
+      }
+
       // HR zone rectangle
       float zone_gap = 5;
       float zone_height = screen_height - (2 * zone_gap);
@@ -159,7 +168,7 @@ display:
       // Heart rate
       it.printf(40, 0, id(font1), "%.0f", id(hr_average));
       // Run glyph
-      it.printf(0, screen_height, id(font4), TextAlign::BASELINE_LEFT, run_glyph);
+      it.printf(0, screen_height - 2, id(font4), TextAlign::BASELINE_LEFT, run_glyph);
       // Print current speed
       it.printf(40, screen_height - 26, id(font1), "%.1f", speed);
       // Zone vertical bar
@@ -360,8 +369,18 @@ interval:
             new_speed = max(id(commanded_speed) - step, id(desired_speed));
           }
 
+          // Round to nearest 0.1mph
+          new_speed = std::round(new_speed * 10.0f) / 10.0f;
+
           ESP_LOGI("actuator", "Stepping speed: %.2f -> %.2f (desired: %.2f, delta was: %.2f)",
                    id(commanded_speed), new_speed, id(desired_speed), delta);
+
+          if (abs((id(commanded_speed) - new_speed)) > 0.05) {
+            // The speed changed - flash the display
+            id(flash_screen_time) = millis();
+            id(main_display).update();
+          }
+
           id(commanded_speed) = new_speed;
 
           id(set_treadmill_speed).execute(new_speed);
@@ -409,6 +428,7 @@ switch:
       - globals.set:
           id: hr_average
           value: '0'
+      - component.update: main_display
     turn_off_action:
       # Reset PID controller
       - lambda: |
@@ -430,3 +450,4 @@ switch:
       - globals.set:
           id: hr_average
           value: '0'
+      - component.update: main_display
