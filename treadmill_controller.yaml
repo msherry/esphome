@@ -76,9 +76,8 @@ esp32_ble_tracker:
   on_ble_advertise:
     - then:
         lambda: |-
-          if (x.get_name() == HEARTCAST || x.get_name() == ECHO) {
-            // Check if we are already connected or connecting
-            if (!id(heartcast_client).connected()) {
+          if (!id(heartcast_client).connected()) {
+            if (x.get_name() == HEARTCAST || x.get_name() == ECHO) {
               ESP_LOGD("heartcast", "Found HeartCast at %s! Connecting...", x.address_str().c_str());
 
               // Use address_uint64() to get the numerical format the client needs
