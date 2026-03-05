@@ -10,7 +10,7 @@ namespace esphome {
             : kp_(kp), ki_(ki), kd_(kd), out_min_(out_min), out_max_(out_max) {
             // Ki will be handling most of our speed setting in the steady
             // state, so let the integral term rise to a good fraction of max
-            INTEGRAL_LIMIT = 0.6 * out_max / ki_;
+            INTEGRAL_LIMIT = ki ? 0.6 * out_max / ki_ : 0.0;
 
             reset();
         }
@@ -21,7 +21,7 @@ namespace esphome {
 
         void PIDController::reset() {
             // Don't start at a standstill
-            integral_ = 2.0 / ki_;
+            integral_ = ki_ ? 3.5 / ki_ : 0.0;
             prev_error_ = 0;
             last_time_ = 0;
             last_output_ = 0;
@@ -52,7 +52,7 @@ namespace esphome {
             float error = setpoint - measured;
 
             // Only integrate if we're close to the setpoint, to prevent too much windup.
-            if (std::abs(error) <= 20) {
+            if (std::abs(error) <= 25) {
                 integral_ += error * dt;
             }
 
