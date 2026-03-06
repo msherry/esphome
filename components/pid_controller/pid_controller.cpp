@@ -40,14 +40,13 @@ namespace esphome {
             }
 
             float dt = (now_ms - last_time_) / 1000.0f;
+            last_time_ = now_ms;
 
             // If it's been too long since our last update, or a nonsensical amount
             // of time, no change.
             if (dt < 0 || dt > 30) {
                 return last_output_;
             }
-
-            last_time_ = now_ms;
 
             float error = setpoint - measured;
 
