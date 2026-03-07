@@ -163,7 +163,7 @@ display:
       float speed = id(commanded_speed);
       auto run_glyph = id(workout_active).state ? (speed >= 5.0 ? "\U000F046E" : "\U000F070E") : "\U000F0667";
       // Heart glyph
-      it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, "\U000F02D1");
+      it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, id(heartcast_client).connected() ? "\U000F02D1" : "\U000F02D5");
       // Heart rate
       it.printf(40, 0, id(font1), "%.0f", id(hr_average));
       // Run glyph
@@ -287,7 +287,6 @@ sensor:
     accuracy_decimals: 1
 
 
-# Poll treadmill speed every N seconds to stay in sync
 interval:
   # # Get the treadmill's reported speed
   # - interval: 30s
@@ -307,8 +306,6 @@ interval:
   - interval: 15s
     then:
       - lambda: |-
-          // Do nothing if the workout is not active
-          if (!id(workout_active).state) return;
 
           if (id(hr_count) > 0) {
             id(hr_average) = id(hr_sum) / id(hr_count);
@@ -318,28 +315,31 @@ interval:
             ESP_LOGI("pid", "HR average over last 15s: %.0f BPM from %d samples",
                      id(hr_average), (int)id(hr_count));
 
-            // Use PID controller to calculate target speed
-            // Error = Target HR - Current HR (positive means we need to increase speed)
-            ESP_LOGD("pid", "Updating PID controller");
-            float speed = id(treadmill_pid).update(target, id(hr_average), millis());
-
-            id(desired_speed) = speed;
-            ESP_LOGD("pid", "Setting desired speed to %.1f mph", speed);
-
-            // Publish stats to HA
             id(hr_average_sensor).publish_state(id(hr_average));
-            // PID debugging
-            id(pid_error_sensor).publish_state(error);
-            id(pid_p_sensor).publish_state(id(treadmill_pid).get_proportional());
-            id(pid_i_sensor).publish_state(id(treadmill_pid).get_integral());
-            id(pid_d_sensor).publish_state(id(treadmill_pid).get_derivative());
-            id(pid_desired_sensor).publish_state(speed);
-
             // Reset accumulator
             id(hr_sum) = 0.0;
             id(hr_count) = 0.0;
+
+            // No PID updates if we're not in an active workout
+            if (id(workout_active).state) {
+              // Use PID controller to calculate target speed
+              // Error = Target HR - Current HR (positive means we need to increase speed)
+              // ESP_LOGD("pid", "Updating PID controller");
+              float speed = id(treadmill_pid).update(target, id(hr_average), millis());
+
+              // ESP_LOGD("pid", "Setting desired speed to %.1f mph", speed);
+              id(desired_speed) = speed;
+
+              // Publish stats to HA
+              // PID debugging
+              id(pid_error_sensor).publish_state(error);
+              id(pid_p_sensor).publish_state(id(treadmill_pid).get_proportional());
+              id(pid_i_sensor).publish_state(id(treadmill_pid).get_integral());
+              id(pid_d_sensor).publish_state(id(treadmill_pid).get_derivative());
+              id(pid_desired_sensor).publish_state(speed);
+            }
           } else {
-            ESP_LOGI("pid", "No HR samples received in last N seconds");
+            // ESP_LOGI("pid", "No HR samples received in last N seconds");
             return;
           }
   # Actuator - update treadmill speed based on desired speed
@@ -382,7 +382,7 @@ interval:
 
           id(commanded_speed) = new_speed;
 
-          id(set_treadmill_speed).execute(new_speed);
+          // id(set_treadmill_speed).execute(new_speed);
 
           // Publish stats to HA
           id(pid_commanded_sensor).publish_state(id(commanded_speed));
