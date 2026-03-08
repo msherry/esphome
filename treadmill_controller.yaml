@@ -47,6 +47,18 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  - id: commanded_speed_sum
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: commanded_speed_count
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: commanded_speed_avg
+    type: float
+    restore_value: no
+    initial_value: '0.0'
   # Flags
   - id: flash_screen_time
     type: float
@@ -161,7 +173,7 @@ display:
                            / zone_spread));
 
       float speed = id(commanded_speed);
-      auto run_glyph = id(workout_active).state ? (speed >= 5.0 ? "\U000F046E" : "\U000F070E") : "\U000F0667";
+      auto run_glyph = id(workout_active).state ? (speed >= id(commanded_speed_avg) ? "\U000F046E" : "\U000F070E") : "\U000F0667";
       // Heart glyph
       it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, id(heartcast_client).connected() ? "\U000F02D1" : "\U000F02D5");
       // Heart rate
@@ -286,6 +298,11 @@ sensor:
     unit_of_measurement: "mph"
     accuracy_decimals: 1
 
+  - platform: template
+    name: "PID Commanded Speed Avg"
+    id: pid_commanded_sensor_avg
+    unit_of_measurement: "mph"
+    accuracy_decimals: 1
 
 interval:
   # # Get the treadmill's reported speed
@@ -374,7 +391,7 @@ interval:
           ESP_LOGI("actuator", "Stepping speed: %.2f -> %.2f (desired: %.2f, delta was: %.2f)",
                    id(commanded_speed), new_speed, id(desired_speed), delta);
 
-          if (abs((id(commanded_speed) - new_speed)) > 0.05) {
+          if (std::abs((id(commanded_speed) - new_speed)) > 0.05) {
             // The speed changed - flash the display
             id(flash_screen_time) = millis();
             id(main_display).update();
@@ -384,8 +401,13 @@ interval:
 
           // id(set_treadmill_speed).execute(new_speed);
 
+          id(commanded_speed_sum) += id(commanded_speed);
+          id(commanded_speed_count) += 1;
+          id(commanded_speed_avg) = id(commanded_speed_sum) / id(commanded_speed_count);
+
           // Publish stats to HA
           id(pid_commanded_sensor).publish_state(id(commanded_speed));
+          id(pid_commanded_sensor_avg).publish_state(id(commanded_speed_avg));
 
 script:
   - id: set_treadmill_speed
@@ -417,6 +439,15 @@ switch:
       - globals.set:
           id: commanded_speed
           value: '0'
+      - globals.set:
+          id: commanded_speed_sum
+          value: '0'
+      - globals.set:
+          id: commanded_speed_count
+          value: '0'
+      - globals.set:
+          id: commanded_speed_avg
+          value: '0'
       # Reset heart rate stats
       - globals.set:
           id: hr_sum
@@ -438,6 +469,15 @@ switch:
           value: '0'
       - globals.set:
           id: commanded_speed
+          value: '0'
+      - globals.set:
+          id: commanded_speed_sum
+          value: '0'
+      - globals.set:
+          id: commanded_speed_count
+          value: '0'
+      - globals.set:
+          id: commanded_speed_avg
           value: '0'
       # Reset heart rate stats
       - globals.set:
