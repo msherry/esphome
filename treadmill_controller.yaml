@@ -19,6 +19,15 @@ esp32:
 packages:
   device_base: !include _common.yaml
 
+web_server:
+  sorting_groups:
+    - id: "sorting_group_hr"
+      name: "Heart rate"
+      sorting_weight: -2
+    - id: "sorting_group_pid"
+      name: "PID control"
+      sorting_weight: -1
+
 logger:
   level: DEBUG
   logs:
@@ -200,22 +209,29 @@ number:
     name: "Target heart rate"
     id: target_hr
     unit_of_measurement: "BPM"
-    icon: 'mdi:heart-pulse'
-    min_value: 60
+    icon: "mdi:bullseye-arrow"
+    min_value: 80
     max_value: 170
     restore_value: true
     optimistic: true
     step: 1
+    web_server:
+      sorting_group_id: sorting_group_hr
+      sorting_weight: 10
+
   - platform: template
     name: "HR zone width"
     id: target_zone_width
     unit_of_measurement: "BPM"
-    icon: 'mdi:heart-pulse'
+    icon: "mdi:arrow-expand-horizontal"
     min_value: 5
-    max_value: 20
+    max_value: 15
     restore_value: true
     optimistic: true
     step: 1
+    web_server:
+      sorting_group_id: sorting_group_hr
+      sorting_weight: 20
 
 pid_controller:
   - id: treadmill_pid
@@ -237,6 +253,7 @@ sensor:
     icon: 'mdi:heart-pulse'
     unit_of_measurement: "BPM"
     accuracy_decimals: 0
+    internal: true
     notify: true  # This allows the iPhone to push updates to the ESP32
     update_interval: never # Don't poll -- wait for notifications
     lambda: |-
@@ -260,6 +277,30 @@ sensor:
     id: hr_average_sensor
     unit_of_measurement: "BPM"
     accuracy_decimals: 0
+    icon: 'mdi:heart-pulse'
+    web_server:
+      sorting_group_id: sorting_group_hr
+      sorting_weight: 100
+
+  - platform: template
+    name: "PID Commanded Speed"
+    id: pid_commanded_sensor
+    unit_of_measurement: "mph"
+    accuracy_decimals: 1
+    icon: "mdi:speedometer"
+    web_server:
+      sorting_group_id: sorting_group_pid
+      sorting_weight: 10
+
+  - platform: template
+    name: "PID Desired Speed"
+    id: pid_desired_sensor
+    unit_of_measurement: "mph"
+    accuracy_decimals: 1
+    icon: "mdi:flag-checkered"
+    web_server:
+      sorting_group_id: sorting_group_pid
+      sorting_weight: 20
 
   # PID debugging
   - platform: template
@@ -267,42 +308,50 @@ sensor:
     id: pid_error_sensor
     unit_of_measurement: "BPM"
     accuracy_decimals: 1
+    icon: "mdi:crosshairs"
+    web_server:
+      sorting_group_id: sorting_group_pid
+      sorting_weight: 30
 
   - platform: template
     name: "PID Proportional"
     id: pid_p_sensor
     unit_of_measurement: "mph"
     accuracy_decimals: 2
+    icon: "mdi:scale-balance"
+    web_server:
+      sorting_group_id: sorting_group_pid
+      sorting_weight: 40
 
   - platform: template
     name: "PID Integral"
     id: pid_i_sensor
     unit_of_measurement: "mph"
     accuracy_decimals: 2
+    icon: "mdi:sigma"
+    web_server:
+      sorting_group_id: sorting_group_pid
+      sorting_weight: 50
 
   - platform: template
     name: "PID Derivative"
     id: pid_d_sensor
     unit_of_measurement: "mph"
     accuracy_decimals: 2
-
-  - platform: template
-    name: "PID Desired Speed"
-    id: pid_desired_sensor
-    unit_of_measurement: "mph"
-    accuracy_decimals: 1
-
-  - platform: template
-    name: "PID Commanded Speed"
-    id: pid_commanded_sensor
-    unit_of_measurement: "mph"
-    accuracy_decimals: 1
+    icon: "mdi:chart-bell-curve"
+    web_server:
+      sorting_group_id: sorting_group_pid
+      sorting_weight: 60
 
   - platform: template
     name: "PID Commanded Speed Avg"
     id: pid_commanded_sensor_avg
     unit_of_measurement: "mph"
     accuracy_decimals: 1
+    icon: "mdi:speedometer-medium"
+    web_server:
+      sorting_group_id: sorting_group_pid
+      sorting_weight: 70
 
 interval:
   # # Get the treadmill's reported speed
@@ -428,6 +477,7 @@ switch:
     platform: template
     name: "Workout active"
     optimistic: true
+    icon: "mdi:run"
     turn_on_action:
       # Reset PID controller
       - lambda: |
