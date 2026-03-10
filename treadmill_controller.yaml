@@ -206,18 +206,52 @@ display:
 
 number:
   - platform: template
-    name: "Target heart rate"
-    id: target_hr
+    name: "Maximum heart rate"
+    id: max_hr
     unit_of_measurement: "BPM"
-    icon: "mdi:bullseye-arrow"
-    min_value: 80
-    max_value: 170
+    icon: "mdi:heart-plus"
+    min_value: 150
+    max_value: 220
     restore_value: true
     optimistic: true
     step: 1
     web_server:
       sorting_group_id: sorting_group_hr
       sorting_weight: 10
+    on_value:
+      - script.execute:
+          id: calculate_hr_zone
+
+  - platform: template
+    name: "Minimum heart rate"
+    id: min_hr
+    unit_of_measurement: "BPM"
+    icon: "mdi:heart-minus"
+    min_value: 30
+    max_value: 90
+    restore_value: true
+    optimistic: true
+    step: 1
+    web_server:
+      sorting_group_id: sorting_group_hr
+      sorting_weight: 20
+    on_value:
+      - script.execute:
+          id: calculate_hr_zone
+
+  - platform: template
+    name: "Target heart rate"
+    id: target_hr
+    unit_of_measurement: "BPM"
+    icon: "mdi:bullseye-arrow"
+    min_value: 80
+    max_value: 200
+    restore_value: true
+    optimistic: true
+    step: 1
+    web_server:
+      sorting_group_id: sorting_group_hr
+      sorting_weight: 30
 
   - platform: template
     name: "HR zone width"
@@ -225,13 +259,34 @@ number:
     unit_of_measurement: "BPM"
     icon: "mdi:arrow-expand-horizontal"
     min_value: 5
-    max_value: 15
+    max_value: 12
     restore_value: true
     optimistic: true
     step: 1
     web_server:
       sorting_group_id: sorting_group_hr
-      sorting_weight: 20
+      sorting_weight: 40
+
+select:
+  - platform: template
+    name: "HR zone"
+    id: hr_zone
+    options:
+      - "Zone 1"
+      - "Zone 2"
+      - "Zone 3"
+      - "Zone 4"
+      - "Zone 5"
+    optimistic: true
+    restore_value: true
+    initial_option: "Zone 2"
+    icon: mdi:layers
+    web_server:
+      sorting_group_id: sorting_group_hr
+      sorting_weight: 50
+    on_value:
+      - script.execute:
+          id: calculate_hr_zone
 
 pid_controller:
   - id: treadmill_pid
@@ -471,6 +526,33 @@ script:
           // NOTE: untested, we don't have a compatible treadmill :(
           id(csafe_parser).set_speed(speed);
           id(csafe_parser).get_speed();  // response handled async by loop()
+
+  - id: calculate_hr_zone
+    then:
+      - lambda: |-
+          float hr_max = id(max_hr).state;
+          float hr_min = id(min_hr).state;
+
+          float zone_lower_bound;
+          std::string zone = id(hr_zone).current_option();
+          if (zone == "Zone 1") {
+              zone_lower_bound = 0.5;
+          } else if (zone == "Zone 2") {
+              zone_lower_bound = 0.6;
+          } else if (zone == "Zone 3") {
+              zone_lower_bound = 0.7;
+          } else if (zone == "Zone 4") {
+              zone_lower_bound = 0.8;
+          } else if (zone == "Zone 5") {
+              zone_lower_bound = 0.9;
+          }
+
+          // Karvonen formula
+          float zone_min = std::round(hr_min + zone_lower_bound * (hr_max - hr_min));
+          float zone_max = std::round(hr_min + (zone_lower_bound + 0.1) * (hr_max - hr_min));
+
+          id(target_hr).publish_state(std::round((zone_min + zone_max) / 2.0f));
+          id(target_zone_width).publish_state((zone_max - zone_min) / 2.0f);
 
 switch:
   - id: workout_active
