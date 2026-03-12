@@ -472,38 +472,39 @@ interval:
 
           float delta = id(desired_speed) - id(commanded_speed);
           float abs_delta = abs(delta);
-          if (abs_delta < 0.05f) return; // deadband
 
-          float step;
-          if (abs_delta > 2.0f) step = 1.0f;
-          else if (abs_delta > 1.0f) step = 0.3f;
-          else if (abs_delta > 0.5f) step = 0.2f;
-          else if (abs_delta > 0.2f) step = 0.1f;
-          else step = 0.05f;
+          // Check if we're outside the deadband before doing updates
+          if (abs_delta >= 0.05f) {
+            float step;
+            if (abs_delta > 2.0f) step = 1.0f;
+            else if (abs_delta > 1.0f) step = 0.3f;
+            else if (abs_delta > 0.5f) step = 0.2f;
+            else if (abs_delta > 0.2f) step = 0.1f;
+            else step = 0.05f;
 
-          // Step toward desired, don't overshoot
-          float new_speed;
-          if (delta > 0) {
-            new_speed = min(id(commanded_speed) + step, id(desired_speed));
-          } else {
-            new_speed = max(id(commanded_speed) - step, id(desired_speed));
+            // Step toward desired, don't overshoot
+            float new_speed;
+            if (delta > 0) {
+              new_speed = min(id(commanded_speed) + step, id(desired_speed));
+            } else {
+              new_speed = max(id(commanded_speed) - step, id(desired_speed));
+            }
+
+            // Round to nearest 0.1mph
+            new_speed = std::round(new_speed * 10.0f) / 10.0f;
+
+            ESP_LOGI("actuator", "Stepping speed: %.2f -> %.2f (desired: %.2f, delta was: %.2f)",
+                     id(commanded_speed), new_speed, id(desired_speed), delta);
+
+            if (id(commanded_speed) != new_speed) {
+              // The speed changed - flash the display
+              id(flash_screen_time) = millis();
+              id(main_display).update();
+            }
+
+            id(commanded_speed) = new_speed;
+            // id(set_treadmill_speed).execute(new_speed);
           }
-
-          // Round to nearest 0.1mph
-          new_speed = std::round(new_speed * 10.0f) / 10.0f;
-
-          ESP_LOGI("actuator", "Stepping speed: %.2f -> %.2f (desired: %.2f, delta was: %.2f)",
-                   id(commanded_speed), new_speed, id(desired_speed), delta);
-
-          if (std::abs((id(commanded_speed) - new_speed)) > 0.05) {
-            // The speed changed - flash the display
-            id(flash_screen_time) = millis();
-            id(main_display).update();
-          }
-
-          id(commanded_speed) = new_speed;
-
-          // id(set_treadmill_speed).execute(new_speed);
 
           id(commanded_speed_sum) += id(commanded_speed);
           id(commanded_speed_count) += 1;
