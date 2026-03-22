@@ -34,11 +34,7 @@ logger:
     sensor: INFO
 
 globals:
-  # Accumulator and count for hr average
-  - id: hr_sum
-    type: float
-    restore_value: no
-    initial_value: '0.0'
+  # Rolling exp. weighted moving average for heart weight
   - id: hr_count
     type: float
     restore_value: no
@@ -325,9 +321,15 @@ sensor:
         return NAN;
     on_value:
       - lambda: |
+          float alpha = 0.80;
           if (!isnan(x)) {
-            id(hr_sum) += x;
             id(hr_count) += 1;
+            if (id(hr_average) > 0) {
+              // Exponential moving average
+              id(hr_average) = alpha * x + (1 - alpha) * id(hr_average);
+            } else {
+              id(hr_average) = x;
+            }
           }
 
   - platform: template
@@ -430,9 +432,7 @@ interval:
   - interval: 15s
     then:
       - lambda: |-
-
           if (id(hr_count) > 0) {
-            id(hr_average) = id(hr_sum) / id(hr_count);
             float target = id(target_hr).state;
             float error = target - id(hr_average);
 
@@ -440,8 +440,7 @@ interval:
                      id(hr_average), (int)id(hr_count));
 
             id(hr_average_sensor).publish_state(id(hr_average));
-            // Reset accumulator
-            id(hr_sum) = 0.0;
+            // Reset count
             id(hr_count) = 0.0;
 
             // No PID updates if we're not in an active workout
@@ -586,9 +585,6 @@ switch:
           value: '0'
       # Reset heart rate stats
       - globals.set:
-          id: hr_sum
-          value: '0'
-      - globals.set:
           id: hr_count
           value: '0'
       - globals.set:
@@ -616,9 +612,6 @@ switch:
           id: commanded_speed_avg
           value: '0'
       # Reset heart rate stats
-      - globals.set:
-          id: hr_sum
-          value: '0'
       - globals.set:
           id: hr_count
           value: '0'
