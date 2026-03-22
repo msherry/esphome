@@ -98,8 +98,11 @@ esp32_ble_tracker:
     - then:
         lambda: |-
           if (!id(heartcast_client).connected()) {
-            if (x.get_name() == HEARTCAST || x.get_name() == ECHO) {
-              ESP_LOGD("heartcast", "Found HeartCast at %s! Connecting...", x.address_str().c_str());
+            if (x.get_name().find(POLAR) != std::string::npos
+                || x.get_name() == HEARTCAST
+                || x.get_name() == ECHO
+               ) {
+              ESP_LOGD("heartcast", "Found %s at %s! Connecting...", x.get_name().c_str(), x.address_str().c_str());
 
               // Use address_uint64() to get the numerical format the client needs
               id(heartcast_client).set_address(x.address_uint64());
@@ -553,7 +556,7 @@ script:
           float zone_max = std::round(hr_min + (zone_lower_bound + 0.1) * (hr_max - hr_min));
 
           id(target_hr).publish_state(std::round((zone_min + zone_max) / 2.0f));
-          id(target_zone_width).publish_state((zone_max - zone_min) / 2.0f);
+          id(target_zone_width).publish_state(std::round((zone_max - zone_min) / 2.0f));
 
 switch:
   - id: workout_active
