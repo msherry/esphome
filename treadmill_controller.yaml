@@ -69,6 +69,10 @@ globals:
     type: float
     restore_value: no
     initial_value: '0.0'
+  - id: ble_connecting
+    type: int
+    restore_value: no
+    initial_value: '0'
 
 wifi:
   fast_connect: true
@@ -93,7 +97,7 @@ esp32_ble_tracker:
   on_ble_advertise:
     - then:
         lambda: |-
-          if (!id(heartcast_client).connected()) {
+          if (!id(heartcast_client).connected() && !id(ble_connecting)) {
             if (x.get_name().find(POLAR) != std::string::npos
                 || x.get_name() == HEARTCAST
                 || x.get_name() == ECHO
@@ -103,6 +107,8 @@ esp32_ble_tracker:
               // Use address_uint64() to get the numerical format the client needs
               id(heartcast_client).set_address(x.address_uint64());
               id(heartcast_client).connect();
+
+              id(ble_connecting) = 1;
             }
           }
 
@@ -119,10 +125,12 @@ ble_client:
       then:
         - lambda: |-
             ESP_LOGD("ble_custom", "Connected! Attempting to enable notifications...");
+            id(ble_connecting) = 0;
     on_disconnect:
       then:
         - lambda: |-
             ESP_LOGD("ble_custom", "Disconnected from HeartCast.");
+            id(ble_connecting) = 0;
 
 font:
   - file: 'SourceSansPro-Light.ttf'
@@ -299,7 +307,7 @@ sensor:
   - platform: ble_client
     type: characteristic
     ble_client_id: heartcast_client
-    name: "Apple Watch Heart Rate"
+    name: "Heart Rate"
     id: hr_sensor
     service_uuid: '180d'        # Per BLE spec
     characteristic_uuid: '2a37' # Per BLE spec
@@ -331,6 +339,29 @@ sensor:
               id(hr_average) = x;
             }
           }
+  - platform: ble_client
+    type: characteristic
+    ble_client_id: heartcast_client
+    name: "HRM Battery Level"
+    id: hrm_battery
+    service_uuid: '180f'        # Battery service
+    characteristic_uuid: '2a19' # Battery level
+    icon: 'mdi:battery-heart-variant'
+    unit_of_measurement: '%'
+    accuracy_decimals: 0
+    notify: false
+    update_interval: 60s
+    lambda: |
+      if (x.size() >= 1) {
+        return (float)x[0];
+      }
+      return NAN;
+    on_value:
+      - lambda: |
+          if (x < 20) {
+            ESP_LOGW("battery", "HRM battery low: %.0f%%", x);
+          }
+
 
   - platform: template
     name: "HR Average"
