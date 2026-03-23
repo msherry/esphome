@@ -32,6 +32,7 @@ logger:
   level: DEBUG
   logs:
     sensor: INFO
+    ble_sensor: INFO
 
 globals:
   # Rolling exp. weighted moving average for heart weight
@@ -40,6 +41,10 @@ globals:
     restore_value: no
     initial_value: '0.0'
   - id: hr_average
+    type: float
+    restore_value: no
+    initial_value: '0.0'
+  - id: display_hr
     type: float
     restore_value: no
     initial_value: '0.0'
@@ -73,6 +78,10 @@ globals:
     type: int
     restore_value: no
     initial_value: '0'
+  - id: last_display_update
+    type: float
+    restore_value: no
+    initial_value: '0.0'
 
 wifi:
   fast_connect: true
@@ -178,6 +187,13 @@ display:
         return;
       }
 
+      // Only actually redraw HR values every N seconds, to avoid HR info
+      // overload. Ok to always display commanded speed
+      if (millis() - id(last_display_update) >= 15000) {
+        id(display_hr) = id(hr_average);
+        id(last_display_update) = millis();
+      }
+
       // HR zone rectangle
       float zone_gap = 5;
       float zone_height = screen_height - (2 * zone_gap);
@@ -185,7 +201,7 @@ display:
       // Position within zone calcs
       float zone_spread = 2 * id(target_zone_width).state;
       float zone_pct = min(1.0f, max(0.0f,
-                           (id(hr_average) - (id(target_hr).state - id(target_zone_width).state))
+                           (id(display_hr) - (id(target_hr).state - id(target_zone_width).state))
                            / zone_spread));
 
       float speed = id(commanded_speed);
@@ -193,7 +209,7 @@ display:
       // Heart glyph
       it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, id(heartcast_client).connected() ? "\U000F02D1" : "\U000F02D5");
       // Heart rate
-      it.printf(40, 0, id(font1), "%.0f", id(hr_average));
+      it.printf(40, 0, id(font1), "%.0f", id(display_hr));
       // Run glyph
       it.printf(0, screen_height - 2, id(font4), TextAlign::BASELINE_LEFT, run_glyph);
       // Print current speed
