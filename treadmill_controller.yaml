@@ -362,7 +362,7 @@ sensor:
     on_value:
       - lambda: |
           if (x < 20) {
-            ESP_LOGW("battery", "HRM battery low: %.0f%%", x);
+            // ESP_LOGW("battery", "HRM battery low: %.0f%%", x);
           }
 
 
