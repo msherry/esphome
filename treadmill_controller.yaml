@@ -35,16 +35,16 @@ logger:
     ble_sensor: INFO
 
 globals:
-  # Rolling exp. weighted moving average for heart weight
+  # Accumulator and count for hr average
+  - id: hr_sum
+    type: float
+    restore_value: no
+    initial_value: '0.0'
   - id: hr_count
     type: float
     restore_value: no
     initial_value: '0.0'
   - id: hr_average
-    type: float
-    restore_value: no
-    initial_value: '0.0'
-  - id: display_hr
     type: float
     restore_value: no
     initial_value: '0.0'
@@ -187,13 +187,6 @@ display:
         return;
       }
 
-      // Only actually redraw HR values every N seconds, to avoid HR info
-      // overload. Ok to always display commanded speed
-      if (millis() - id(last_display_update) >= 15000) {
-        id(display_hr) = id(hr_average);
-        id(last_display_update) = millis();
-      }
-
       // HR zone rectangle
       float zone_gap = 5;
       float zone_height = screen_height - (2 * zone_gap);
@@ -201,7 +194,7 @@ display:
       // Position within zone calcs
       float zone_spread = 2 * id(target_zone_width).state;
       float zone_pct = min(1.0f, max(0.0f,
-                           (id(display_hr) - (id(target_hr).state - id(target_zone_width).state))
+                           (id(hr_average) - (id(target_hr).state - id(target_zone_width).state))
                            / zone_spread));
 
       float speed = id(commanded_speed);
@@ -209,7 +202,7 @@ display:
       // Heart glyph
       it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, id(heartcast_client).connected() ? "\U000F02D1" : "\U000F02D5");
       // Heart rate
-      it.printf(40, 0, id(font1), "%.0f", id(display_hr));
+      it.printf(40, 0, id(font1), "%.0f", id(hr_average));
       // Run glyph
       it.printf(0, screen_height - 2, id(font4), TextAlign::BASELINE_LEFT, run_glyph);
       // Print current speed
@@ -345,15 +338,9 @@ sensor:
         return NAN;
     on_value:
       - lambda: |
-          float alpha = 0.80;
           if (!isnan(x)) {
+            id(hr_sum) += x;
             id(hr_count) += 1;
-            if (id(hr_average) > 0) {
-              // Exponential moving average
-              id(hr_average) = alpha * x + (1 - alpha) * id(hr_average);
-            } else {
-              id(hr_average) = x;
-            }
           }
   - platform: ble_client
     type: characteristic
@@ -480,6 +467,7 @@ interval:
     then:
       - lambda: |-
           if (id(hr_count) > 0) {
+            id(hr_average) = id(hr_sum) / id(hr_count);
             float target = id(target_hr).state;
             float error = target - id(hr_average);
 
@@ -487,7 +475,8 @@ interval:
                      id(hr_average), (int)id(hr_count));
 
             id(hr_average_sensor).publish_state(id(hr_average));
-            // Reset count
+            // Reset accumulator
+            id(hr_sum) = 0.0;
             id(hr_count) = 0.0;
 
             // No PID updates if we're not in an active workout
@@ -632,6 +621,9 @@ switch:
           value: '0'
       # Reset heart rate stats
       - globals.set:
+          id: hr_sum
+          value: '0'
+      - globals.set:
           id: hr_count
           value: '0'
       - globals.set:
@@ -659,6 +651,9 @@ switch:
           id: commanded_speed_avg
           value: '0'
       # Reset heart rate stats
+      - globals.set:
+          id: hr_sum
+          value: '0'
       - globals.set:
           id: hr_count
           value: '0'
