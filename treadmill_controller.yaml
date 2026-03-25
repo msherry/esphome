@@ -353,7 +353,7 @@ sensor:
     unit_of_measurement: '%'
     accuracy_decimals: 0
     notify: false
-    update_interval: 60s
+    update_interval: 600s
     lambda: |
       if (x.size() >= 1) {
         return (float)x[0];
