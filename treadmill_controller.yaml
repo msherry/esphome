@@ -179,6 +179,16 @@ display:
     show_test_card: false
     update_interval: 1s
     lambda: |-
+      // Icon map for readable icon references
+      static const std::map<std::string, const char*> icons = {
+        {"heart_on", "\U000F02D1"},
+        {"heart_off", "\U000F02D5"},
+        {"run_fast", "\U000F046E"},
+        {"run_stop", "\U000F0667"},
+        {"run", "\U000F070E"},
+        {"arrow", "\U000F19B0"}
+      };
+
       int screen_height = it.get_height();
       int screen_width = it.get_width();
 
@@ -198,9 +208,15 @@ display:
                            / zone_spread));
 
       float speed = id(commanded_speed);
-      auto run_glyph = id(workout_active).state ? (speed >= id(commanded_speed_avg) ? "\U000F046E" : "\U000F070E") : "\U000F0667";
+      const char* run_glyph;
+      if (id(workout_active).state) {
+        run_glyph = (speed >= id(commanded_speed_avg)) ? icons.at("run_fast") : icons.at("run");
+      } else {
+        run_glyph = icons.at("run_stop");
+      }
       // Heart glyph
-      it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, id(heartcast_client).connected() ? "\U000F02D1" : "\U000F02D5");
+      const char* heart_glyph = id(heartcast_client).connected() ? icons.at("heart_on") : icons.at("heart_off");
+      it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, heart_glyph);
       // Heart rate
       it.printf(40, 0, id(font1), "%.0f", id(hr_average));
       // Run glyph
@@ -217,7 +233,7 @@ display:
                 "%.0f", id(target_hr).state + id(target_zone_width).state);
       // HR zone indicator
       it.printf(screen_width-46, zone_gap + zone_pct * (zone_height - 3) - 5,
-                id(font3), TextAlign::TOP_LEFT, "\U000F19B0");
+                id(font3), TextAlign::TOP_LEFT, icons.at("arrow"));
 
 
 number:
@@ -598,6 +614,7 @@ switch:
     platform: template
     name: "Workout active"
     optimistic: true
+    restore_mode: ALWAYS_OFF
     icon: "mdi:run"
     turn_on_action:
       # Reset PID controller
