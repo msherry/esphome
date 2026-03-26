@@ -491,10 +491,10 @@ interval:
   #           id(commanded_speed) = polled_speed;
   #         }
 
-  # PID update
   - interval: 15s
     then:
       - lambda: |-
+          // PID update
           if (id(hr_count) > 0) {
             id(hr_average) = id(hr_sum) / id(hr_count);
             float target = id(target_hr).state;
@@ -528,12 +528,9 @@ interval:
             }
           } else {
             // ESP_LOGI("pid", "No HR samples received in last N seconds");
-            return;
           }
-  # Actuator - update treadmill speed based on desired speed
-  - interval: 15s
-    then:
-      - lambda: |-
+
+          // Actuator - update treadmill speed based on desired speed
           // Do nothing if the workout is not active
           if (!id(workout_active).state) return;
 
@@ -541,13 +538,13 @@ interval:
           float abs_delta = abs(delta);
 
           // Check if we're outside the deadband before doing updates
-          if (abs_delta >= 0.05f) {
+          if (abs_delta >= 0.15f) {
             float step;
-            if (abs_delta > 2.0f) step = 1.0f;
+            if (abs_delta > 2.0f)      step = 1.0f;
             else if (abs_delta > 1.0f) step = 0.3f;
             else if (abs_delta > 0.5f) step = 0.2f;
             else if (abs_delta > 0.2f) step = 0.1f;
-            else step = 0.05f;
+            else                       step = 0.1f;
 
             // Step toward desired, don't overshoot
             float new_speed;
