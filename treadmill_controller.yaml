@@ -224,7 +224,7 @@ display:
       }
       const char* heart_glyph;
       if (id(heartcast_client).connected()) {
-        heart_glyph = (now - id(hr_update_ts) <= 5000) ? icons.at("heart_flash") : icons.at("heart_on");
+        heart_glyph = (now - id(hr_update_ts) <= 5000) ? icons.at("heart_on") : icons.at("heart_flash");
       } else {
         heart_glyph = icons.at("heart_off");
       }
