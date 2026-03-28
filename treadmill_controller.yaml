@@ -195,10 +195,10 @@ display:
       // Icon map for readable icon references
       static const std::map<std::string, const char*> icons = {
         {"heart_flash", "\U000F0EF9"},
-        {"heart_on", "\U000F02D1"},
-        {"heart_off", "\U000F02D5"},
+        {"heart", "\U000F02D1"},
+        {"heart_outline", "\U000F02D5"},
         {"run_fast", "\U000F046E"},
-        {"run_stop", "\U000F0667"},
+        {"stop_circle_outline", "\U000F0667"},
         {"run", "\U000F070E"},
         {"arrow", "\U000F19B0"}
       };
@@ -234,13 +234,13 @@ display:
       if (id(workout_active).state) {
         run_glyph = (speed >= id(commanded_speed_avg)) ? icons.at("run_fast") : icons.at("run");
       } else {
-        run_glyph = icons.at("run_stop");
+        run_glyph = icons.at("stop_circle_outline");
       }
       const char* heart_glyph;
       if (id(heartcast_client).connected()) {
-        heart_glyph = (now - id(hr_update_ts) <= 5000) ? icons.at("heart_on") : icons.at("heart_flash");
+        heart_glyph = (now - id(hr_update_ts) <= 5000) ? icons.at("heart") : icons.at("heart_flash");
       } else {
-        heart_glyph = icons.at("heart_off");
+        heart_glyph = icons.at("heart_outline");
       }
       it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, heart_glyph);
       // Heart rate
