@@ -677,6 +677,19 @@ script:
           value: '0'
       - component.update: main_display
 
+# Momentary button input to toggle workout_active switch
+# Connect a momentary button between GPIO13 and GND
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO13
+      mode: INPUT_PULLUP
+      inverted: true
+    name: "Workout toggle button"
+    id: workout_toggle_button
+    on_press:
+      - switch.toggle: workout_active
+
 switch:
   - id: workout_active
     platform: template
