@@ -22,6 +22,11 @@ tol     = 0.25;  // fit tolerance between lip and box opening
 // Screen (top face / lid)
 screen_w = 25.41;
 screen_h = 17.02;
+screen_pcb_w = 25.50;
+screen_pcb_h = 27.00;
+screen_thickness = 2.05;  // In addition to pcb thickness
+screen_pcb_thickness = 1.00;
+screen_total_thickness = screen_thickness + screen_pcb_thickness;
 
 // Ethernet (bottom face)
 eth_w = 16.85;
@@ -31,6 +36,7 @@ eth_h = 16.10;
 // Standard USB-C receptacle ~8.94 × 2.56 mm; add margin for shell + alignment
 usbc_w  = 9.5;   // Y span
 usbc_h  = 3.5;   // Z span
+usbc_height = 2.5;  // Height from bottom
 
 // --- Screw bosses (M3) ---
 boss_od     = 6.0;   // boss outer diameter
@@ -63,7 +69,7 @@ module box_body() {
         // ---- USB-C cutout — right face (X+), centred in Y and Z ----
         translate([box_l - wall - 0.01,
                    (box_w - usbc_w) / 2,
-                   2.5])
+                   usbc_height])
             cube([wall + 0.02, usbc_w, usbc_h]);
     }
 
@@ -97,11 +103,17 @@ module lid() {
                 cube([lip_x, lip_y, lid_lip]);
         }
 
-        // ---- Screen cutout — centred on lid top face ----
+        // ---- Screen cutout — centered on lid top face ----
         translate([(box_l - screen_w) / 2,
                    (box_w - screen_h) / 2,
                    -lid_lip -0.01])
             cube([screen_w, screen_h, lid_lip + lid_h + 0.02]);
+
+        // Screen pcb cutout - centered on lid top face, inset enough to make screen flush
+        translate([(box_l - screen_pcb_w) / 2,
+                   (box_w - screen_pcb_h) / 2,
+                   -lid_lip - 0.01])
+            cube([screen_pcb_w, screen_pcb_h, lid_lip + lid_h - screen_total_thickness + 0.02]);
 
         // ---- M3 clearance holes through lid (align with bosses) ----
         for (x = [boss_inset, box_l - boss_inset])
