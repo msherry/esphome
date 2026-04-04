@@ -348,8 +348,8 @@ select:
 
 pid_controller:
   - id: treadmill_pid
-    kp: 0.05
-    ki: 0.0008
+    kp: 0.05                    # mph / bpm error
+    ki: 0.0008                  # kp / 1 time constant (60-120 seconds)
     kd: 0.02
     output_min: 3.0
     output_max: 12.0
@@ -388,7 +388,7 @@ sensor:
             id(hr_update_ts) = millis();
 
             // EMA of HR, for display
-            float alpha = 0.33;
+            static const float alpha = 0.33;
             id(hr_ema) = alpha * x + (1 - alpha) * id(hr_ema);
           }
   - platform: ble_client
