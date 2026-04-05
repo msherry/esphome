@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ESPHome OLED Emulator — SSD1306 128×64</title>
+<style id="auto-font-faces">
+  @font-face { font-family: 'SourceSansPro-Light'; src: url('SourceSansPro-Light.ttf'); }
+  @font-face { font-family: 'MaterialDesignIcons'; src: url('materialdesignicons-webfont.ttf'); }
+</style>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow: hidden; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 13px;
+  background: #0d1117;
+  color: #c9d1d9;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+#header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 14px;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+  flex-shrink: 0;
+}
+#header h1 { font-size: 13px; font-weight: 500; color: #e6edf3; }
+#header .sep { color: #30363d; }
+#header .sub { font-size: 11px; color: #484f58; font-family: monospace; }
+.spacer { flex: 1; }
+
+.btn {
+  padding: 4px 12px;
+  border-radius: 5px;
+  border: 1px solid #30363d;
+  background: #21262d;
+  color: #c9d1d9;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+}
+.btn:hover { background: #30363d; }
+.btn.green { background: #1a4422; border-color: #2ea043; color: #3fb950; font-weight: 500; }
+.btn.green:hover { background: #238636; color: #fff; }
+.btn.blue { background: #0d2748; border-color: #1f6feb; color: #58a6ff; }
+.btn.blue:hover { background: #1f6feb; color: #fff; }
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+#main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+#left {
+  width: 430px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid #21262d;
+  overflow-y: auto;
+}
+#right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Sections ────────────────────────────────────────────────────────────── */
+.sect {
+  padding: 12px 14px;
+  border-bottom: 1px solid #21262d;
+}
+.sect-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #388bfd;
+  font-weight: 500;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.sect-title .note {
+  font-size: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: #484f58;
+}
+
+/* ── OLED display ────────────────────────────────────────────────────────── */
+#display-wrap {
+  display: flex;
+  justify-content: center;
+}
+#bezel {
+  background: #000;
+  border: 2px solid #1a1f27;
+  border-radius: 6px;
+  padding: 14px;
+  position: relative;
+}
+#bezel::after {
+  content: 'SSD1306 0.96"';
+  position: absolute;
+  bottom: 3px; right: 6px;
+  font-size: 8px;
+  color: #1a1f27;
+  font-family: monospace;
+}
+#oled { display: block; }
+#display-meta { text-align: center; font-size: 10px; color: #30363d; font-family: monospace; margin-top: 5px; }
+
+/* ── Font table ──────────────────────────────────────────────────────────── */
+#font-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+#font-table th { text-align: left; color: #484f58; font-weight: 400; padding: 2px 4px; border-bottom: 1px solid #21262d; }
+#font-table td { padding: 4px 4px; vertical-align: middle; }
+#font-table code { font-size: 11px; color: #79c0ff; }
+#font-table input[type=text] {
+  width: 100%; background: #0d1117; border: 1px solid #21262d;
+  color: #e6edf3; padding: 2px 5px; border-radius: 3px;
+  font-size: 11px; font-family: monospace;
+}
+#font-table input[type=number] {
+  width: 46px; background: #0d1117; border: 1px solid #21262d;
+  color: #e6edf3; padding: 2px 5px; border-radius: 3px;
+  font-size: 11px; font-family: monospace;
+}
+.fstatus { font-size: 10px; color: #30363d; }
+.fstatus.ok { color: #3fb950; }
+.font-row { margin-top: 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+/* ── Variables ───────────────────────────────────────────────────────────── */
+.var-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+.var-name {
+  font-size: 11px;
+  font-family: monospace;
+  color: #8b949e;
+  width: 150px;
+  flex-shrink: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.var-row input[type=range] {
+  flex: 1;
+  height: 3px;
+  -webkit-appearance: none;
+  background: #21262d;
+  border-radius: 2px;
+  outline: none;
+}
+.var-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px; height: 12px;
+  background: #388bfd;
+  border-radius: 50%;
+  cursor: pointer;
+}
+.var-val { font-size: 11px; font-family: monospace; color: #e6edf3; width: 36px; text-align: right; }
+
+/* Toggle */
+.toggle {
+  position: relative; width: 34px; height: 18px; cursor: pointer; flex-shrink: 0;
+}
+.toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+.tog-bg {
+  position: absolute; inset: 0;
+  background: #21262d; border-radius: 9px;
+  border: 1px solid #30363d; transition: background 0.15s;
+}
+.tog-dot {
+  position: absolute; top: 3px; left: 3px;
+  width: 12px; height: 12px;
+  background: #484f58; border-radius: 50%;
+  transition: transform 0.15s, background 0.15s;
+  pointer-events: none;
+}
+.toggle input:checked ~ .tog-bg { background: #1f6feb; border-color: #388bfd; }
+.toggle input:checked ~ .tog-dot { transform: translateX(16px); background: #fff; }
+.tog-val { font-size: 11px; font-family: monospace; color: #8b949e; width: 36px; }
+
+/* ── Editor ──────────────────────────────────────────────────────────────── */
+#editor-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: #161b22;
+  border-bottom: 1px solid #21262d;
+  flex-shrink: 0;
+}
+#editor-label { font-size: 11px; color: #484f58; font-family: monospace; }
+#error-msg { font-size: 11px; color: #f85149; font-family: monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#js-preview-wrap {
+  display: none;
+  flex: 1;
+  overflow: hidden;
+  flex-direction: column;
+}
+#js-preview {
+  flex: 1;
+  background: #060d19;
+  color: #8b949e;
+  border: none;
+  outline: none;
+  padding: 12px;
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.55;
+  resize: none;
+  overflow-y: auto;
+}
+#lambda-editor {
+  flex: 1;
+  background: #0d1117;
+  color: #e6edf3;
+  border: none;
+  outline: none;
+  padding: 12px;
+  font-family: 'SFMono-Regular', 'Consolas', monospace;
+  font-size: 12px;
+  line-height: 1.6;
+  resize: none;
+  tab-size: 2;
+  -webkit-tab-size: 2;
+}
+#lambda-editor:focus { outline: none; }
+
+/* ── Misc ────────────────────────────────────────────────────────────────── */
+.hint { font-size: 10px; color: #484f58; margin-top: 5px; }
+.auto-chk { display: flex; align-items: center; gap: 5px; font-size: 12px; color: #8b949e; cursor: pointer; }
+input[type=file] { display: none; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>ESPHome OLED Emulator</h1>
+  <span class="sep">·</span>
+  <span class="sub">SSD1306 128×64</span>
+  <div class="spacer"></div>
+  <label class="auto-chk"><input type="checkbox" id="show-js"> show JS</label>
+  <label class="auto-chk"><input type="checkbox" id="auto-render" checked> auto</label>
+  <button class="btn green" id="run-btn">▶ Render</button>
+</div>
+
+<div id="main">
+  <!-- Left column -->
+  <div id="left">
+
+    <!-- Display -->
+    <div class="sect">
+      <div id="display-wrap">
+        <div>
+          <div id="bezel">
+            <canvas id="oled" width="384" height="192"></canvas>
+          </div>
+          <div id="display-meta">128 × 64 px · 3× pixel grid</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Fonts -->
+    <div class="sect">
+      <div class="sect-title">Fonts <span class="note">— place .ttf files alongside this HTML, or load manually</span></div>
+      <table id="font-table">
+        <thead><tr>
+          <th style="width:46px">id</th>
+          <th>family name</th>
+          <th style="width:52px">size px</th>
+          <th style="width:70px">status</th>
+        </tr></thead>
+        <tbody id="font-tbody"></tbody>
+      </table>
+      <div class="font-row">
+        <button class="btn blue" id="load-btn">Load font files…</button>
+        <input type="file" id="font-picker" accept=".ttf,.otf,.woff,.woff2" multiple>
+        <span class="hint" style="margin:0">Match family names to your ESPHome font: file fields</span>
+      </div>
+    </div>
+
+    <!-- Variables -->
+    <div class="sect">
+      <div class="sect-title">Variables <span class="note">— auto-detected from id() calls</span></div>
+      <div id="vars-list"><div class="hint">Render to detect variables.</div></div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn blue" id="flash-btn">⚡ Flash screen</button>
+        <button class="btn" id="reset-state-btn">Reset state</button>
+      </div>
+    </div>
+
+  </div><!-- /left -->
+
+  <!-- Right column: editor -->
+  <div id="right">
+    <div id="editor-header">
+      <span id="editor-label">lambda (C++)</span>
+      <div class="spacer"></div>
+      <span id="error-msg"></span>
+    </div>
+    <textarea id="lambda-editor" spellcheck="false"></textarea>
+    <div id="js-preview-wrap">
+      <div style="padding:5px 12px;background:#0a1020;border-top:1px solid #21262d;font-size:10px;color:#484f58;font-family:monospace">
+        transpiled JS (read-only preview)
+      </div>
+      <textarea id="js-preview" readonly spellcheck="false"></textarea>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// ─── Default lambda ───────────────────────────────────────────────────────────
+const DEFAULT_LAMBDA = `// Icon map
+static const std::map<std::string, const char*> icons = {
+  {"heart_flash", "\\U000F0EF9"},
+  {"heart",       "\\U000F02D1"},
+  {"heart_outline","\\U000F02D5"},
+  {"run_fast",    "\\U000F046E"},
+  {"stop_circle_outline","\\U000F0667"},
+  {"run",         "\\U000F070E"},
+  {"arrow",       "\\U000F19B0"}
+};
+
+int screen_height = it.get_height();
+int screen_width  = it.get_width();
+uint32_t now = millis();
+
+if (now - id(flash_screen_ts) < 250) {
+  it.filled_rectangle(0, 0, screen_width, screen_height);
+  return;
+}
+
+if (now - id(display_update_ts) >= 5000 || id(display_hr) == 0) {
+  id(display_hr) = id(hr_ema);
+  id(display_update_ts) = now;
+}
+
+float zone_gap    = 5;
+float zone_height = screen_height - (2 * zone_gap);
+float zone_spread = 2 * id(target_zone_width).state;
+float zone_pct    = min(1.0f, max(0.0f,
+  (id(display_hr) - (id(target_hr).state - id(target_zone_width).state))
+  / zone_spread));
+
+float speed = id(commanded_speed);
+
+const char* run_glyph;
+if (id(workout_active).state) {
+  run_glyph = (speed >= id(commanded_speed_avg)) ? icons.at("run_fast") : icons.at("run");
+} else {
+  run_glyph = icons.at("stop_circle_outline");
+}
+
+const char* heart_glyph;
+if (id(heartcast_client).connected()) {
+  heart_glyph = (now - id(hr_update_ts) <= 5000) ? icons.at("heart") : icons.at("heart_flash");
+} else {
+  heart_glyph = icons.at("heart_outline");
+}
+
+it.printf(0, 26, id(font4), TextAlign::BASELINE_LEFT, heart_glyph);
+it.printf(40, 0, id(font1), "%.0f", id(display_hr));
+it.printf(0, screen_height - 2, id(font4), TextAlign::BASELINE_LEFT, run_glyph);
+it.printf(40, screen_height - 26, id(font1), "%.1f", speed);
+it.filled_rectangle(screen_width - 32, (screen_height - zone_height) / 2, 10, zone_height);
+it.printf(screen_width - 20, (screen_height - zone_height) / 2 - 3, id(font2), TextAlign::TOP_LEFT,
+          "%.0f", id(target_hr).state - id(target_zone_width).state);
+it.printf(screen_width - 20, screen_height - zone_gap, id(font2), TextAlign::BASELINE_LEFT,
+          "%.0f", id(target_hr).state + id(target_zone_width).state);
+it.printf(screen_width - 46, zone_gap + zone_pct * (zone_height - 3) - 5,
+          id(font3), TextAlign::TOP_LEFT, icons.at("arrow"));`;
+
+// ─── Font definitions ─────────────────────────────────────────────────────────
+let fontDefs = [
+  { id: 'font1', family: 'SourceSansPro-Light', size: 22, file: 'SourceSansPro-Light.ttf', loaded: false },
+  { id: 'font2', family: 'SourceSansPro-Light', size: 12, file: 'SourceSansPro-Light.ttf', loaded: false },
+  { id: 'font3', family: 'MaterialDesignIcons', size: 16, file: 'materialdesignicons-webfont.ttf', loaded: false },
+  { id: 'font4', family: 'MaterialDesignIcons', size: 34, file: 'materialdesignicons-webfont.ttf', loaded: false },
+];
+
+function renderFontTable() {
+  const tbody = document.getElementById('font-tbody');
+  tbody.innerHTML = '';
+  fontDefs.forEach((def, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><code>${def.id}</code></td>
+      <td><input type="text" value="${def.family}" data-i="${i}" data-f="family"></td>
+      <td><input type="number" value="${def.size}" min="6" max="80" data-i="${i}" data-f="size"></td>
+      <td><span class="fstatus ${def.loaded ? 'ok' : ''}">${def.loaded ? '✓ loaded' : '○ missing'}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const i = +inp.dataset.i, f = inp.dataset.f;
+      fontDefs[i][f] = f === 'size' ? +inp.value : inp.value;
+      scheduleRender();
+    });
+  });
+}
+
+async function tryLoadFont(family, url) {
+  try {
+    const face = new FontFace(family, `url(${url})`);
+    await face.load();
+    document.fonts.add(face);
+    return true;
+  } catch { return false; }
+}
+
+async function autoLoadFonts() {
+  const seen = new Set();
+  for (const def of fontDefs) {
+    if (seen.has(def.file)) continue;
+    seen.add(def.file);
+    const ok = await tryLoadFont(def.family, def.file);
+    if (ok) fontDefs.filter(d => d.file === def.file).forEach(d => d.loaded = true);
+  }
+  renderFontTable();
+  scheduleRender();
+}
+
+document.getElementById('load-btn').addEventListener('click', () =>
+  document.getElementById('font-picker').click());
+
+document.getElementById('font-picker').addEventListener('change', async (e) => {
+  for (const file of e.target.files) {
+    const url = URL.createObjectURL(file);
+    const stripped = file.name.replace(/\.[^.]+$/, '');
+    // Match by filename or family
+    let matches = fontDefs.filter(d =>
+      d.file === file.name ||
+      d.family.replace(/\s/g,'').toLowerCase() === stripped.replace(/\s/g,'').toLowerCase()
+    );
+    if (matches.length === 0) {
+      const family = prompt(`Assign "${file.name}" to font family:`, stripped);
+      if (!family) continue;
+      matches = fontDefs.filter(d => d.family === family);
+      if (matches.length === 0) { alert('No font definition uses family "' + family + '"'); continue; }
+    }
+    const family = matches[0].family;
+    const ok = await tryLoadFont(family, url);
+    if (ok) matches.forEach(d => d.loaded = true);
+    else alert(`Failed to load ${file.name} as "${family}"`);
+  }
+  renderFontTable();
+  scheduleRender();
+  e.target.value = '';
+});
+
+// ─── State / Variables ────────────────────────────────────────────────────────
+const DEFAULT_STATE = {
+  flash_screen_ts:    0,
+  display_update_ts:  0,   // always stale → display_hr updates each render
+  hr_update_ts:       Date.now() - 1000,  // recent by default → solid heart
+  display_hr:         0,
+};
+let _state = { ...DEFAULT_STATE };
+
+// Pre-render hooks: called before each render to keep derived state fresh
+const preRenderHooks = {
+  // Keep display_update_ts stale so display_hr always refreshes from hr_ema
+  display_update_ts: () => { _state.display_update_ts = 0; },
+};
+
+// Hints: controls appearance/range for detected variables
+const VAR_HINTS = {
+  hr_ema:              { min: 60, max: 200, value: 138, step: 1 },
+  display_hr:          { hidden: true },
+  display_update_ts:   { hidden: true },
+  flash_screen_ts:     { hidden: true },
+  hr_update_ts:        { recentBool: true, label: 'HR data recent (<5s)', value: true },
+  target_hr:           { min: 100, max: 180, value: 137, step: 1 },
+  target_zone_width:   { min: 2,   max: 20,  value: 7,   step: 1 },
+  commanded_speed:     { min: 0,   max: 8,   value: 3.5, step: 0.1 },
+  commanded_speed_avg: { min: 0,   max: 8,   value: 3.5, step: 0.1 },
+  workout_active:      { bool: true, value: true },
+  heartcast_client_connected: { bool: true, value: true },
+};
+
+const BOOL_PATTERNS    = ['active','connected','enable','running','flag','fresh','on_off','ready'];
+const TS_PATTERNS      = ['_ts','_timestamp','_timer','_time'];
+const RECENT_BOOL_PATTERNS = ['hr_update_ts'];
+
+function inferHint(name) {
+  if (BOOL_PATTERNS.some(p => name.toLowerCase().includes(p))) return { bool: true, value: false };
+  if (TS_PATTERNS.some(p => name.endsWith(p)))               return { hidden: true };
+  if (name.includes('hr') || name.includes('heart'))         return { min: 60,  max: 200, value: 130, step: 1 };
+  if (name.includes('speed'))                                return { min: 0,   max: 8,   value: 3.0, step: 0.1 };
+  if (name.includes('temp'))                                 return { min: -20, max: 100, value: 20,  step: 0.5 };
+  if (name.includes('pct') || name.includes('percent'))      return { min: 0,   max: 100, value: 50,  step: 1 };
+  return { min: 0, max: 100, value: 0, step: 1 };
+}
+
+let lastVarKey = '';
+function buildVarUI(vars) {
+  const key = [...vars].sort().join(',');
+  if (key === lastVarKey) return;
+  lastVarKey = key;
+
+  const container = document.getElementById('vars-list');
+  container.innerHTML = '';
+
+  // Remove old recentBool hooks
+  for (const k of Object.keys(preRenderHooks)) {
+    if (k !== 'display_update_ts') delete preRenderHooks[k];
+  }
+
+  const visible = vars.filter(n => {
+    const h = VAR_HINTS[n] || inferHint(n);
+    return !h.hidden;
+  });
+
+  if (visible.length === 0) {
+    container.innerHTML = '<div class="hint">No id() variables detected.</div>';
+    return;
+  }
+
+  visible.forEach(name => {
+    const hint = VAR_HINTS[name] || inferHint(name);
+    if (hint.hidden) return;
+
+    const row = document.createElement('div');
+    row.className = 'var-row';
+
+    if (hint.recentBool) {
+      // Special: toggle controls whether ts is "recent" (< threshold)
+      const cur = hint.value ?? true;
+      _state[name] = cur ? Date.now() - 1000 : 0;
+      preRenderHooks[name] = () => {
+        const el = document.getElementById('rb_' + name);
+        _state[name] = el && el.checked ? Date.now() - 1000 : 0;
+      };
+      row.innerHTML = `
+        <span class="var-name" title="${name}">${hint.label || name}</span>
+        <label class="toggle">
+          <input type="checkbox" id="rb_${name}" ${cur ? 'checked' : ''} onchange="scheduleRender()">
+          <div class="tog-bg"></div><div class="tog-dot"></div>
+        </label>
+        <span class="tog-val" id="rv_${name}">${cur ? 'recent' : 'stale'}</span>`;
+      const inp = row.querySelector('input');
+      inp.addEventListener('change', () => {
+        document.getElementById('rv_' + name).textContent = inp.checked ? 'recent' : 'stale';
+      });
+
+    } else if (hint.bool) {
+      const cur = _state[name] ?? (hint.value ?? false);
+      _state[name] = cur;
+      row.innerHTML = `
+        <span class="var-name" title="${name}">${name}</span>
+        <label class="toggle">
+          <input type="checkbox" ${cur ? 'checked' : ''} onchange="onToggle(this,'${name}')">
+          <div class="tog-bg"></div><div class="tog-dot"></div>
+        </label>
+        <span class="tog-val" id="tv_${name}">${cur ? 'true' : 'false'}</span>`;
+
+    } else {
+      const min = hint.min ?? 0, max = hint.max ?? 100, step = hint.step ?? 1;
+      const cur = Math.max(min, Math.min(max, _state[name] ?? hint.value ?? min));
+      _state[name] = cur;
+      const decimals = step < 1 ? 1 : 0;
+      row.innerHTML = `
+        <span class="var-name" title="${name}">${name}</span>
+        <input type="range" min="${min}" max="${max}" step="${step}" value="${cur}"
+               oninput="onSlider(this,'${name}',${decimals})">
+        <span class="var-val" id="sv_${name}">${cur.toFixed(decimals)}</span>`;
+    }
+
+    container.appendChild(row);
+  });
+}
+
+function onToggle(el, name) {
+  _state[name] = el.checked;
+  const lbl = document.getElementById('tv_' + name);
+  if (lbl) lbl.textContent = el.checked ? 'true' : 'false';
+  scheduleRender();
+}
+function onSlider(el, name, decimals) {
+  const v = +el.value;
+  _state[name] = v;
+  const lbl = document.getElementById('sv_' + name);
+  if (lbl) lbl.textContent = v.toFixed(decimals);
+  scheduleRender();
+}
+
+document.getElementById('flash-btn').addEventListener('click', () => {
+  _state.flash_screen_ts = Date.now();
+  scheduleRender();
+  setTimeout(scheduleRender, 350);
+});
+document.getElementById('reset-state-btn').addEventListener('click', () => {
+  _state = { ...DEFAULT_STATE };
+  lastVarKey = ''; // force UI rebuild
+  scheduleRender();
+});
+
+// ─── Transpiler: C++ ESPHome lambda → JS ─────────────────────────────────────
+function transpile(cpp) {
+  let js = cpp;
+
+  // Unicode escape: \U000F02D1 → \u{F02D1}
+  js = js.replace(/\\U000([0-9A-Fa-f]{5})/g, '\\u{$1}');
+
+  // static const std::map<...> name = { → const name = {
+  js = js.replace(/static\s+const\s+std::map\s*<[^>]+>\s*(\w+)\s*=/g, 'const $1 =');
+
+  // Map entry pairs: {"key", "val"} → "key": "val"
+  // Handles string values (the common case for icon maps)
+  js = js.replace(/\{\s*"([^"]+)"\s*,\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')\s*\}/g, '"$1": $2');
+
+  // Variable declarations: remove C++ type qualifiers
+  js = js.replace(/\b(?:static\s+)?(?:const\s+)?(?:uint(?:8|16|32|64)_t|int(?:8|16|32|64)_t|int|float|double|bool|auto|size_t)\s+(\w+)\s*(?=\s*[=;{])/g,
+    (m, name) => m.includes('=') || m.includes(';') ? 'let ' + name + m.slice(m.indexOf(name) + name.length) : m);
+  // Simpler blanket approach for declarations:
+  js = js.replace(/\b(const\s+)?(uint(?:8|16|32|64)_t|int(?:8|16|32|64)_t|int|float|double|bool|auto|size_t)\s+(\w+)\s*=/g, 'let $3 =');
+  js = js.replace(/\b(const\s+)?(uint(?:8|16|32|64)_t|int(?:8|16|32|64)_t|int|float|double|bool|auto|size_t)\s+(\w+)\s*;/g, 'let $3;');
+  js = js.replace(/\bconst\s+char\s*\*\s*(\w+)\s*=/g, 'let $1 =');
+  js = js.replace(/\bconst\s+char\s*\*\s*(\w+)\s*;/g, 'let $1;');
+  js = js.replace(/\bchar\s*\*\s*(\w+)\s*=/g, 'let $1 =');
+
+  // Float literal suffixes: 1.0f → 1.0, 5f → 5.0
+  js = js.replace(/(\d+\.\d*)[fF]\b/g, '$1');
+  js = js.replace(/\b(\d+)[fF]\b/g, '$1.0');
+
+  // C++ casts (just remove them; best-effort)
+  js = js.replace(/\(float\)\s*/g, '');
+  js = js.replace(/\(double\)\s*/g, '');
+  js = js.replace(/\(int\)\s*/g, '');
+  js = js.replace(/\(uint32_t\)\s*/g, '');
+
+  // id() assignments (must precede general id() replacement)
+  js = js.replace(/\bid\((\w+)\)\s*=/g, '_state["$1"] =');
+
+  // id(name).connected() → _state["name_connected"]
+  js = js.replace(/\bid\((\w+)\)\.connected\(\)/g, '(_state["$1_connected"] ?? false)');
+
+  // id(name).state → _state["name"]
+  js = js.replace(/\bid\((\w+)\)\.state\b/g, '(_state["$1"] ?? 0)');
+
+  // id(fontN) → "fontN" (font references, before general id replacement)
+  js = js.replace(/\bid\((font\w+)\)/g, '"$1"');
+
+  // Remaining id(name) → plain value access
+  js = js.replace(/\bid\((\w+)\)/g, '(_state["$1"] ?? 0)');
+
+  // millis() → Date.now()
+  js = js.replace(/\bmillis\(\)/g, 'Date.now()');
+
+  // min/max: avoid clobbering Math.min / .min() method calls
+  js = js.replace(/(?<![.\w])min\s*\(/g, 'Math.min(');
+  js = js.replace(/(?<![.\w])max\s*\(/g, 'Math.max(');
+
+  // TextAlign::XXX → 'XXX'
+  js = js.replace(/TextAlign::(\w+)/g, "'$1'");
+
+  // .at("key") → ["key"]
+  js = js.replace(/\.at\("([^"]+)"\)/g, '["$1"]');
+
+  // it.xxx snake_case → camelCase
+  js = js.replace(/it\.filled_rectangle\s*\(/g, 'it.filledRectangle(');
+  js = js.replace(/it\.filled_circle\s*\(/g, 'it.filledCircle(');
+  js = js.replace(/it\.get_height\s*\(\)/g, 'it.getHeight()');
+  js = js.replace(/it\.get_width\s*\(\)/g, 'it.getWidth()');
+  js = js.replace(/it\.draw_pixel_at\s*\(/g, 'it.drawPixel(');
+
+  // std:: namespace (anything leftover)
+  js = js.replace(/std::/g, '');
+
+  return js;
+}
+
+// ─── Variable detection ───────────────────────────────────────────────────────
+function detectVars(jsCode) {
+  const seen = new Set();
+  const re = /_state\["([^"]+)"\]/g;
+  let m;
+  while ((m = re.exec(jsCode)) !== null) seen.add(m[1]);
+  return [...seen];
+}
+
+// ─── Printf formatter ─────────────────────────────────────────────────────────
+function esphomePrintf(fmt, args) {
+  let i = 0;
+  return String(fmt).replace(/%(-?\d*\.?\d*)([diouxXeEfgGsS%])/g, (_, spec, type) => {
+    if (type === '%') return '%';
+    const val = args[i++];
+    if (val === undefined || val === null) return '';
+    const prec = spec.includes('.') ? parseInt(spec.split('.')[1]) : undefined;
+    if ('feEgG'.includes(type)) return prec !== undefined ? (+val).toFixed(prec) : (+val).toFixed(6);
+    if ('di'.includes(type))   return Math.trunc(+val).toString();
+    if (type === 'u')          return (Math.trunc(+val) >>> 0).toString();
+    if ('xX'.includes(type))  { const h = (Math.trunc(+val) >>> 0).toString(16); return type === 'X' ? h.toUpperCase() : h; }
+    return String(val);
+  });
+}
+
+// ─── TextAlign map ────────────────────────────────────────────────────────────
+const ALIGN_MAP = {
+  TOP_LEFT:        ['top',        'left'   ],
+  TOP_RIGHT:       ['top',        'right'  ],
+  TOP_CENTER:      ['top',        'center' ],
+  CENTER_LEFT:     ['middle',     'left'   ],
+  CENTER:          ['middle',     'center' ],
+  CENTER_RIGHT:    ['middle',     'right'  ],
+  BASELINE_LEFT:   ['alphabetic', 'left'   ],
+  BASELINE_RIGHT:  ['alphabetic', 'right'  ],
+  BASELINE_CENTER: ['alphabetic', 'center' ],
+  BOTTOM_LEFT:     ['bottom',     'left'   ],
+  BOTTOM_RIGHT:    ['bottom',     'right'  ],
+  BOTTOM_CENTER:   ['bottom',     'center' ],
+};
+const ALIGN_KEYS = new Set(Object.keys(ALIGN_MAP));
+
+// ─── ESPHome display API ──────────────────────────────────────────────────────
+function makeAPI(ctx) {
+  const W = 128, H = 64;
+
+  function font(id) {
+    const def = fontDefs.find(d => d.id === id);
+    return def ? `${def.size}px "${def.family}"` : `${id}`;
+  }
+  function applyAlign(a) {
+    const [baseline, align] = ALIGN_MAP[a] || ['top', 'left'];
+    ctx.textBaseline = baseline;
+    ctx.textAlign = align;
+  }
+  function draw(text, x, y, fontId, align) {
+    ctx.save();
+    ctx.font = font(fontId);
+    applyAlign(align || 'TOP_LEFT');
+    ctx.fillStyle = '#fff';
+    ctx.fillText(String(text), x, y);
+    ctx.restore();
+  }
+
+  return {
+    getWidth:  () => W,
+    getHeight: () => H,
+
+    printf(x, y, fontId, ...rest) {
+      let align = 'TOP_LEFT', fmt, args;
+      if (ALIGN_KEYS.has(rest[0])) { align = rest[0]; fmt = rest[1]; args = rest.slice(2); }
+      else                         { fmt = rest[0];  args = rest.slice(1); }
+      if (fmt == null) return;
+      const text = args.length ? esphomePrintf(fmt, args) : String(fmt);
+      draw(text, x, y, fontId, align);
+    },
+
+    print(x, y, fontId, ...rest) {
+      let align = 'TOP_LEFT', text;
+      if (ALIGN_KEYS.has(rest[0])) { align = rest[0]; text = rest[1]; }
+      else                         { text = rest[0]; }
+      draw(text ?? '', x, y, fontId, align);
+    },
+
+    filledRectangle(x, y, w, h) {
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(x, y, w, h);
+    },
+    rectangle(x, y, w, h) {
+      ctx.save(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, w, h);
+      ctx.restore();
+    },
+    line(x1, y1, x2, y2) {
+      ctx.save(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x1 + 0.5, y1 + 0.5); ctx.lineTo(x2 + 0.5, y2 + 0.5);
+      ctx.stroke(); ctx.restore();
+    },
+    circle(cx, cy, r) {
+      ctx.save(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    },
+    filledCircle(cx, cy, r) {
+      ctx.save(); ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    },
+    drawPixel(x, y) {
+      ctx.fillStyle = '#fff'; ctx.fillRect(x, y, 1, 1);
+    },
+    image() {},  // not supported
+  };
+}
+
+// ─── Canvas rendering ─────────────────────────────────────────────────────────
+const displayCanvas = document.getElementById('oled');
+const dc = displayCanvas.getContext('2d');
+
+const offCanvas = document.createElement('canvas');
+offCanvas.width = 128; offCanvas.height = 64;
+const oc = offCanvas.getContext('2d');
+
+const SCALE = 3, DOT = 2; // 3px per pixel, 2×2 dot + 1px gap
+
+function renderPixelGrid() {
+  dc.fillStyle = '#050a0e';
+  dc.fillRect(0, 0, 384, 192);
+  const img = oc.getImageData(0, 0, 128, 64).data;
+  for (let y = 0; y < 64; y++) {
+    for (let x = 0; x < 128; x++) {
+      const b = img[(y * 128 + x) * 4];
+      if (b > 6) {
+        const t = b / 255;
+        // Warm white with slight cyan tint — typical SSD1306 appearance
+        dc.fillStyle = `rgba(${Math.round(210 + 45*t)},${Math.round(228 + 27*t)},255,${(0.35 + 0.65*t).toFixed(2)})`;
+        dc.fillRect(x * SCALE, y * SCALE, DOT, DOT);
+      }
+    }
+  }
+}
+
+// ─── Main render pipeline ─────────────────────────────────────────────────────
+let lastJsCode = '';
+
+function runLambda() {
+  const cpp = document.getElementById('lambda-editor').value;
+  const js  = transpile(cpp);
+
+  // Apply pre-render hooks
+  for (const fn of Object.values(preRenderHooks)) fn();
+
+  // Build variable UI on change
+  if (js !== lastJsCode) {
+    lastJsCode = js;
+    buildVarUI(detectVars(js));
+    if (document.getElementById('show-js').checked) {
+      document.getElementById('js-preview').value = js;
+    }
+  }
+
+  // Draw
+  oc.fillStyle = '#000';
+  oc.fillRect(0, 0, 128, 64);
+
+  clearError();
+  try {
+    // eslint-disable-next-line no-new-func
+    const fn = new Function('it', '_state', 'Math', 'Date', 'String', 'Number', 'Boolean', js);
+    fn(makeAPI(oc), _state, Math, Date, String, Number, Boolean);
+  } catch (e) {
+    showError(e.message);
+  }
+
+  renderPixelGrid();
+}
+
+function showError(msg) { document.getElementById('error-msg').textContent = '⚠ ' + msg; }
+function clearError()   { document.getElementById('error-msg').textContent = ''; }
+
+let renderTimer = null;
+function scheduleRender(delay = 0) {
+  if (renderTimer) clearTimeout(renderTimer);
+  renderTimer = setTimeout(runLambda, delay);
+}
+
+// ─── Editor wiring ────────────────────────────────────────────────────────────
+const editor = document.getElementById('lambda-editor');
+
+editor.addEventListener('input', () => {
+  if (document.getElementById('auto-render').checked) scheduleRender(350);
+});
+editor.addEventListener('keydown', (e) => {
+  // Tab inserts spaces
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    const s = editor.selectionStart;
+    editor.value = editor.value.slice(0, s) + '  ' + editor.value.slice(editor.selectionEnd);
+    editor.selectionStart = editor.selectionEnd = s + 2;
+  }
+});
+document.getElementById('run-btn').addEventListener('click', runLambda);
+
+document.getElementById('show-js').addEventListener('change', (e) => {
+  const wrap = document.getElementById('js-preview-wrap');
+  const editorEl = document.getElementById('lambda-editor');
+  if (e.target.checked) {
+    wrap.style.display = 'flex';
+    editorEl.style.flex = '0 0 50%';
+    document.getElementById('js-preview').value = lastJsCode;
+  } else {
+    wrap.style.display = 'none';
+    editorEl.style.flex = '1';
+  }
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+editor.value = DEFAULT_LAMBDA;
+renderFontTable();
+document.fonts.ready.then(() => {
+  autoLoadFonts();
+  scheduleRender(100);
+});
+</script>
+</body>
+</html>
