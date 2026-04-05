@@ -335,8 +335,9 @@ select:
       - "Zone 3"
       - "Zone 4"
       - "Zone 5"
+      - "Tempo"
     optimistic: true
-    restore_value: true
+    restore_value: no
     initial_option: "Zone 2"
     icon: mdi:layers
     web_server:
@@ -630,6 +631,9 @@ script:
               zone_lower_bound = 0.8;
           } else if (zone == "Zone 5") {
               zone_lower_bound = 0.9;
+          } else if (zone == "Tempo") {
+              // Threshold between zones 3 and 4
+              zone_lower_bound = 0.75;
           }
 
           // Karvonen formula
