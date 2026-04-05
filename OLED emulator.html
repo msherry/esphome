@@ -637,8 +637,9 @@ function transpile(cpp) {
   js = js.replace(/\bchar\s*\*\s*(\w+)\s*=/g, 'let $1 =');
 
   // Float literal suffixes: 1.0f → 1.0, 5f → 5.0
+  // Negative lookbehind for '.' prevents matching the 'f' in printf format specs like %.0f
   js = js.replace(/(\d+\.\d*)[fF]\b/g, '$1');
-  js = js.replace(/\b(\d+)[fF]\b/g, '$1.0');
+  js = js.replace(/(?<!\.)\b(\d+)[fF]\b/g, '$1.0');
 
   // C++ casts (just remove them; best-effort)
   js = js.replace(/\(float\)\s*/g, '');
