@@ -10,7 +10,7 @@ namespace esphome {
             : kp_(kp), ki_(ki), kd_(kd), out_min_(out_min), out_max_(out_max) {
             // Ki will be handling most of our speed setting in the steady
             // state, so let the integral term rise to a good fraction of max
-            INTEGRAL_LIMIT = ki ? 0.6 * out_max / ki_ : 0.0;
+            INTEGRAL_LIMIT = ki ? 0.8 * out_max / ki_ : 0.0;
 
             reset();
         }
