@@ -51,7 +51,7 @@ namespace esphome {
             float error = setpoint - measured;
 
             // Only integrate if we're close to the setpoint, to prevent too much windup.
-            if (std::abs(error) <= 25) {
+            if (std::abs(error) <= 40) {
                 integral_ += error * dt;
             }
 
