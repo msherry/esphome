@@ -21,7 +21,7 @@ namespace esphome {
 
         void PIDController::reset() {
             // Don't start at a standstill
-            integral_ = ki_ ? 3.5 / ki_ : 0.0;
+            integral_ = ki_ ? 4.5 / ki_ : 0.0;
             prev_error_ = 0;
             last_time_ = 0;
             last_output_ = 0;
