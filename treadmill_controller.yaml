@@ -31,9 +31,10 @@ web_server:
 logger:
   level: DEBUG
   logs:
-    sensor: INFO
     ble_sensor: INFO
     number: INFO
+    select: INFO
+    sensor: INFO
 
 globals:
   # Accumulator and count for hr average
@@ -270,7 +271,7 @@ number:
     unit_of_measurement: "BPM"
     icon: "mdi:heart-plus"
     min_value: 150
-    max_value: 220
+    max_value: 200
     restore_value: true
     optimistic: true
     step: 1
@@ -287,7 +288,7 @@ number:
     unit_of_measurement: "BPM"
     icon: "mdi:heart-minus"
     min_value: 30
-    max_value: 90
+    max_value: 70
     restore_value: true
     optimistic: true
     step: 1
@@ -303,7 +304,7 @@ number:
     id: target_hr
     unit_of_measurement: "BPM"
     icon: "mdi:bullseye-arrow"
-    min_value: 80
+    min_value: 100
     max_value: 200
     restore_value: true
     optimistic: true
