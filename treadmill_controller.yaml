@@ -33,6 +33,7 @@ logger:
   logs:
     sensor: INFO
     ble_sensor: INFO
+    number: INFO
 
 globals:
   # Accumulator and count for hr average
@@ -41,7 +42,7 @@ globals:
     restore_value: no
     initial_value: '0.0'
   - id: hr_count
-    type: float
+    type: int
     restore_value: no
     initial_value: '0.0'
   - id: hr_average
@@ -70,7 +71,7 @@ globals:
     restore_value: no
     initial_value: '0.0'
   - id: commanded_speed_count
-    type: float
+    type: int
     restore_value: no
     initial_value: '0.0'
   - id: commanded_speed_avg
@@ -91,7 +92,7 @@ globals:
     restore_value: no
     initial_value: '0'
   - id: display_update_ts
-    type: float
+    type: uint32_t
     restore_value: no
     initial_value: '0.0'
 
@@ -637,11 +638,13 @@ script:
           }
 
           // Karvonen formula
-          float zone_min = std::round(hr_min + zone_lower_bound * (hr_max - hr_min));
-          float zone_max = std::round(hr_min + (zone_lower_bound + 0.1) * (hr_max - hr_min));
+          int zone_min = std::round(hr_min + zone_lower_bound * (hr_max - hr_min));
+          int zone_max = std::round(hr_min + (zone_lower_bound + 0.1) * (hr_max - hr_min)) - 1;
 
           id(target_hr).publish_state(std::round((zone_min + zone_max) / 2.0f));
           id(target_zone_width).publish_state(std::round((zone_max - zone_min) / 2.0f));
+          ESP_LOGI("hr_zone", "HR zone: %s  Lower: %d  Upper: %d  Target: %d  Width: %d",
+          zone.c_str(), zone_min, zone_max, (int)id(target_hr).state, (int)id(target_zone_width).state);
 
   - id: reset_globals
     then:
