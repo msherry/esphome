@@ -336,7 +336,7 @@ select:
       - "Zone 3"
       - "Zone 4"
       - "Zone 5"
-      - "Tempo"
+      - "Tempo (Z3/4)"
     optimistic: true
     restore_value: no
     initial_option: "Zone 2"
@@ -351,7 +351,7 @@ select:
 pid_controller:
   - id: treadmill_pid
     kp: 0.05                    # mph / bpm error
-    ki: 0.0008                  # kp / 1 time constant (60-120 seconds)
+    ki: 0.0006                  # kp / 1 time constant (60-120 seconds)
     kd: 0.02
     output_min: 3.0
     output_max: 12.0
@@ -560,7 +560,7 @@ interval:
           float abs_delta = abs(delta);
 
           // Check if we're outside the deadband before doing updates
-          if (abs_delta >= 0.15f) {
+          if (abs_delta >= 0.16f) {
             float step;
             if (abs_delta > 2.0f)      step = 1.0f;
             else if (abs_delta > 1.0f) step = 0.3f;
@@ -632,7 +632,7 @@ script:
               zone_lower_bound = 0.8;
           } else if (zone == "Zone 5") {
               zone_lower_bound = 0.9;
-          } else if (zone == "Tempo") {
+          } else if (zone == "Tempo (Z3/4)") {
               // Threshold between zones 3 and 4
               zone_lower_bound = 0.75;
           }
