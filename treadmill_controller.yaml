@@ -640,7 +640,7 @@ script:
 
           // Karvonen formula
           int zone_min = std::round(hr_min + zone_lower_bound * (hr_max - hr_min));
-          int zone_max = std::round(hr_min + (zone_lower_bound + 0.1) * (hr_max - hr_min)) - 1;
+          int zone_max = std::round(hr_min + (zone_lower_bound + 0.1) * (hr_max - hr_min)) - (zone_lower_bound < 0.9 ? 1 : 0.0);
 
           id(target_hr).publish_state(std::round((zone_min + zone_max) / 2.0f));
           id(target_zone_width).publish_state(std::round((zone_max - zone_min) / 2.0f));
